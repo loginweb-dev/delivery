@@ -10,6 +10,7 @@ class Ubicacione extends Model
 	protected $fillable = [
         'latitud',
         'longitud',
-        'cliente_id'
+        'cliente_id',
+        'detalles'
     ];
 }

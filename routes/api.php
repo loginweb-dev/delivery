@@ -27,7 +27,7 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
 // negocios
 Route::get('negocios', function(){
-    return Negocio::with('productos')->get();
+    return Negocio::where('estado', true)->with('productos')->get();
 });
 Route::get('negocio/{id}', function($id){
     return Negocio::where('id', $id)->with('productos')->first();
@@ -95,14 +95,16 @@ Route::post('chatbot/venta/save', function (Request $request) {
         'cliente_id' => $request->cliente_id,
         'pago_id' => $request->pago_id,
         'mensajero_id'=>1,
+        'estado_id'=>1,
         'chatbot_id' => $request->chatbot_id,
+        'ubicacion_id' => $request->ubicacion_id,
         'descuento' => 0,
         'total'=>$request->total
     ]);
     $mitotal = 0;
     foreach ($carts as $item) {
         PedidoDetalle::create([
-            'producto_id' => $item->product_id, //falta
+            'producto_id' => $item->product_id,
             'pedido_id' =>  $newpedido->id,
             'precio'=> $item->precio,
             'cantidad' => $item->cantidad,
@@ -138,6 +140,14 @@ Route::get('cliente/{phone}', function ($phone) {
         return $newcliente;
     }
 });
+Route::post('cliente/update', function (Request $request) {
+    $cliente = Cliente::find($request->id);
+    $cliente->nombre = $request->nombre;
+    $cliente->save();
+    $newcliente = Cliente::find($request->id);
+    return $newcliente;
+});
+
 
 //ubicacion/save
 Route::post('ubicacion/save', function (Request $request) {
@@ -148,4 +158,15 @@ Route::post('ubicacion/save', function (Request $request) {
     ]);
     return $ubicacion;
 });
+Route::post('ubicacion/update', function (Request $request) {
+    $ubicacion = Ubicacione::find($request->id);
+    $ubicacion->detalles = $request->detalle;
+    $ubicacion->save();
+    return $ubicacion;
+});
 
+//pedidos
+Route::get('pedidos/{phone}', function ($phone) {
+    return Pedido::where('chatbot_id', $phone)->with('estado', 'mensajero', 'productos')->get();
+
+});
