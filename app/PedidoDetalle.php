@@ -3,6 +3,7 @@
 namespace App;
 
 use Illuminate\Database\Eloquent\Model;
+use Carbon\Carbon;
 
 
 class PedidoDetalle extends Model
@@ -13,7 +14,18 @@ class PedidoDetalle extends Model
         'precio',
         'cantidad',
         'producto_name',
-        'total'
+        'total',
+        'negocio_id',
+        'negocio_name'
     ];
+
+    protected $appends=['published'];
+	public function getPublishedAttribute(){
+		return Carbon::createFromTimeStamp(strtotime($this->attributes['created_at']) )->diffForHumans();
+	}
+    public function negocio()
+    {
+        return $this->belongsTo(Negocio::class, 'negocio_id');
+    }
 
 }

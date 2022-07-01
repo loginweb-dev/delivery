@@ -38,4 +38,20 @@ class Pedido extends Model
     {
         return $this->hasMany(PedidoDetalle::class);
     }
+    public function cliente()
+    {
+        return $this->belongsTo(Cliente::class, 'cliente_id');
+    }
+    public function ubicacion()
+    {
+        return $this->belongsTo(Ubicacione::class, 'ubicacion_id');
+    }
+    public function pasarela()
+    {
+        return $this->belongsTo(Pago::class, 'pago_id');
+    }
+    public function comentario()
+    {
+        return $this->hasMany(Comentario::class);
+    }
 }
