@@ -13,6 +13,7 @@ use App\Ubicacione;
 use App\Mensajero;
 use App\Comentario;
 use App\Poblacione;
+use App\Banipay;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -29,8 +30,8 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 });
 
 // negocios
-Route::get('negocios', function(){
-    return Negocio::where('estado', true)->with('productos')->get();
+Route::get('negocios/{poblacion_id}', function($poblacion_id){
+    return Negocio::where('estado', true)->where('poblacion_id', $poblacion_id)->with('productos')->get();
 });
 Route::get('negocio/{id}', function($id){
     return Negocio::where('id', $id)->with('productos')->first();
@@ -115,7 +116,7 @@ Route::get('chatbot/pasarelas/get',function(){
 });
 
 // VENTAS
-Route::post('chatbot/venta/save', function (Request $request) {
+Route::post('pedido/save', function (Request $request) {
     $carts = Carrito::where('chatbot_id', $request->chatbot_id)->with('producto')->get();
     $newpedido = Pedido::create([
         'cliente_id' => $request->cliente_id,
@@ -145,7 +146,8 @@ Route::post('chatbot/venta/save', function (Request $request) {
     $miupdate->total = $mitotal-($miupdate->descuento);
     $miupdate->save();
     Carrito::where('chatbot_id', $request->chatbot_id)->delete();
-    return $newpedido;
+    $lastpedido = Pedido::where('id', $newpedido->id)->with('cliente', 'productos', 'ubicacion', 'mensajero', 'banipay')->first();
+    return $lastpedido;
 });
 
 Route::post('chatbot/cart/clean', function (Request $request) {
@@ -158,7 +160,7 @@ Route::get('filtros/{negocio_id}', function ($negocio_id) {
 
 //clientes
 Route::get('cliente/{phone}', function ($phone) {
-    $micliente =  Cliente::where('chatbot_id', $phone)->with('pedidos')->first();
+    $micliente =  Cliente::where('chatbot_id', $phone)->with('pedidos', 'ubicaciones', 'localidad')->first();
     if ($micliente) {
         return $micliente;
     } else {
@@ -168,9 +170,17 @@ Route::get('cliente/{phone}', function ($phone) {
         return $newcliente;
     }
 });
-Route::post('cliente/update', function (Request $request) {
+Route::post('cliente/update/nombre', function (Request $request) {
     $cliente = Cliente::find($request->id);
     $cliente->nombre = $request->nombre;
+    $cliente->save();
+    $newcliente = Cliente::find($request->id);
+    return $newcliente;
+});
+
+Route::post('cliente/update/localidad', function (Request $request) {
+    $cliente = Cliente::find($request->id);
+    $cliente->poblacion_id = $request->poblacion_id;
     $cliente->save();
     $newcliente = Cliente::find($request->id);
     return $newcliente;
@@ -211,7 +221,7 @@ Route::get('negocios/pedido/{midata}', function($midata){
 
 //Buscar Pedido con Cliente
  Route::get('pedido/{id}', function($id){
-    return Pedido::where('id', $id)->with('cliente', 'productos', 'ubicacion', 'mensajero')->first();
+    return Pedido::where('id', $id)->with('cliente', 'productos', 'ubicacion', 'mensajero', 'banipay')->first();
  });
 
  //Asignar Pedido a Mensajero
@@ -250,7 +260,7 @@ Route::get('negocios/pedido/{midata}', function($midata){
     }    
  });
  Route::get('mensajero/{phone}', function ($phone) {
-    $mimensajero =  Mensajero::where('telefono', $phone)->with('pedidos')->first();
+    $mimensajero =  Mensajero::where('telefono', $phone)->with('pedidos', 'localidad')->first();
     if ($mimensajero) {
         return $mimensajero;
     } else {
@@ -340,4 +350,15 @@ Route::get('negocio/update/{phone}', function($phone){
     $mimsg->estado = $mimsg->estado ? false : true;
     $mimsg->save();
     return Negocio::where('chatbot_id', $phone)->with('productos', 'poblacion')->first();
+});
+
+//banipay
+Route::post('banipay/save', function(Request $request) {
+    $banipay = Banipay::create([
+        'pedido_id' => $request->externalCode,
+        'paymentId' => $request->paymentId,
+        'transactionGenerated' => $request->transactionGenerated,
+        'urlTransaction' => '?t='.$request->transactionGenerated.'&p='.$request->paymentId
+    ]);
+    return $banipay;
 });

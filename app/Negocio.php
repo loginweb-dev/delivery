@@ -5,6 +5,7 @@ namespace App;
 use Illuminate\Database\Eloquent\Model;
 
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Carbon\Carbon;
 class Negocio extends Model
 {
     
@@ -14,6 +15,15 @@ class Negocio extends Model
     //     'direccion',
     //     'problacion_id'
     // ];
+
+    protected $appends=['published', 'fecha'];
+    public function getPublishedAttribute(){
+      return Carbon::createFromTimeStamp(strtotime($this->attributes['created_at']) )->diffForHumans();
+    }
+    public function getFechaAttribute(){
+      return date('Y-m-d', strtotime($this->attributes['created_at']));
+    }
+    
 	public function productos()
     {
         return $this->hasMany(Producto::class);

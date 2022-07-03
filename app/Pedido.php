@@ -54,4 +54,8 @@ class Pedido extends Model
     {
         return $this->hasMany(Comentario::class);
     }
+    public function banipay()
+    {
+        return $this->hasOne(Banipay::class);
+    }
 }

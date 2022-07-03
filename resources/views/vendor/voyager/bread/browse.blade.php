@@ -62,15 +62,19 @@
                                             <div class="col-4">
                                                 <select id="search_key" name="key" style="width: 250px" class="js-example-basic-single">
                                                         <option value=""> ---- Elige un Filtro ----</option>
+                                                        <option value="id"> Pedido </option>
+                                                        <option value="cliente_id"> Cliente </option>
+                                                        <option value="mensajero_id"> Mensajero </option>
                                                         <option value="reporte_diario"> Reporte Diario </option>
-                                                        {{-- <option value="insumo_id"> Insumo </option> --}}
                                                 </select>
                                             </div>
-                                            <div class="col-6">
+                                            <div class="col-2">
                                                 <select id="filter" name="filter">
                                                         <option value="equals"> = </option>
                                                 </select>
-                                                <select class="js-example-basic-single" id="s" name="s" onchange="this.form.submit()" style="width: 350px"></select>
+                                            </div>
+                                            <div class="col-6">
+                                                <input type="text" name="s" id="s" class="form-control" onchange="this.form.submit()">
                                             </div>
                                         </div>
                                     </form>
@@ -378,7 +382,6 @@
                                                     <th>Productos</th>
                                                     <th>Total</th>
                                                     <th>Delivery</th>
-                                                    <th>Acción</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -630,7 +633,7 @@
                     }
                 }
                 async function Consulta2(pedidos){
-                    console.log(pedidos.data)
+                    //console.log(pedidos.data)
                     var negocios= await axios.get("{{setting('admin.url')}}api/all/negocios")
                     for (let index = 0; index < negocios.data.length; index++) {
                         var pedido_id=0;
@@ -648,14 +651,8 @@
                                     productos+=pedidos.data[j].productos[k].cantidad
                                     total+=pedidos.data[j].productos[k].cantidad*pedidos.data[j].productos[k].precio
                                     aux_cantidad=1
+                                    aux_delivery=1
                                 }
-                            }
-
-                            if (pedido_id!=0) {
-                                aux_delivery=CalcularDelivery(pedido_id, negocios.data[index].id)
-                            }
-                            else{
-                                aux_delivery=0
                             }
                             cantidad_pedidos+=aux_cantidad
                             delivery+= parseFloat(aux_delivery) *parseFloat("{{setting('pedidos.comision_delivery_san_pablo')}}")                            
@@ -664,24 +661,15 @@
                             aux_delivery=0
                         }
                         if(cantidad_pedidos>0){
-                            console.log("Negocio: "+negocios.data[index].nombre)
-                            console.log("Pedidos: "+cantidad_pedidos)
-                            console.log("Productos: "+productos)
-                            console.log("Total: "+total)
-                            console.log("Delivery: "+delivery) 
+                            // console.log("Negocio: "+negocios.data[index].nombre)
+                            // console.log("Pedidos: "+cantidad_pedidos)
+                            // console.log("Productos: "+productos)
+                            // console.log("Total: "+total)
+                            // console.log("Delivery: "+delivery)
+                            $('#table_reporte_diario').append("<tr><td>"+negocios.data[index].nombre+"</td><td>"+cantidad_pedidos+"</td><td>"+productos+"</td><td>"+total+"</td><td>"+delivery+"</td></tr>") 
                         }
                                                
                     }
-                }
-                async function CalcularDelivery(pedido_id, negocio_id){
-                    var comision=0
-                    var pedido= await axios("{{setting('admin.url')}}api/pedido/"+pedido_id)
-                    for (let index = 0; index < pedido.data.productos.length; index++) {
-                        if (pedido.data.productos[index].negocio_id ==negocio_id) {
-                            comision+=1
-                        }
-                    }
-                    return comision;
                 }
             @break
             @default

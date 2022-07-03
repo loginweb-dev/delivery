@@ -12,13 +12,10 @@ const { json } = require('express');
 const categorias = new JSONdb('json/categorias.json');
 const negocios = new JSONdb('json/negocios.json');
 const productos = new JSONdb('json/productos.json');
-const cupones = new JSONdb('json/cupones.json');
 const carts = new JSONdb('json/carts.json');
 const pasarelas = new JSONdb('json/pasarelas.json');
-const sucursales = new JSONdb('json/sucursales.json');
 const locations = new JSONdb('json/locations.json');
-const asignaciones = new JSONdb('json/asignaciones.json');
-const pedidos = new JSONdb('json/pedidos.json');
+const localidades = new JSONdb('json/localidades.json');
 
 require('dotenv').config({ path: '../../.env' })
 
@@ -62,17 +59,18 @@ client.on('message', async msg => {
     console.log(msg.type)
 
     var micliente = await axios(process.env.APP_URL+'api/cliente/'+msg.from)
-    console.log(micliente.data.nombre)
+    // console.log(micliente.data.nombre)
     if (micliente.data.nombre) {
-        // if (micliente.data.poblacion_id) {
+        if (micliente.data.poblacion_id) {
             if (msg.type === 'chat') {
                 switch (true) {
                     case (msg.body === 'hola') || (msg.body === 'HOLA') || (msg.body === 'Hola') || (msg.body === 'Buenas')|| (msg.body === 'buenas') || (msg.body === 'BUENAS') || (msg.body === '0'):
                         menu_principal(micliente, msg.from)
                         break;
                     case (msg.body === 'A') || (msg.body === 'a'):
-                        var miresponse = await axios(process.env.APP_URL+'api/negocios')
+                        var miresponse = await axios(process.env.APP_URL+'api/negocios/'+micliente.data.poblacion_id)
                         var list = '*🏚️ NEGOCIOS DISPONIBLES 🏚️* \n'
+                        list += micliente.data.localidad.nombre+'\n'
                         list += '----------------------------------'+' \n'
                         for (let index = 0; index < miresponse.data.length; index++) {
                             list += '*A'+miresponse.data[index].id+'* .- '+miresponse.data[index].nombre+' - ('+miresponse.data[index].productos.length+')\n'
@@ -90,11 +88,11 @@ client.on('message', async msg => {
                         var miresponse = await axios(process.env.APP_URL+'api/filtros/'+negocios.get(msg.body.toUpperCase()))
                         var minegocio = miresponse.data[0].negocio
                         var miestado = (miresponse.data[0].negocio.estado == 1) ? 'Abierto' : 'Cerrado'
-                        var list = '*'+minegocio.nombre+'*\n'
+                        var list = '*'+minegocio.nombre.toUpperCase()+'*\n'
                         list += '----------------------------------'+'\n'
-                        list += 'Estado : '+miestado+'\n'
-                        list += 'Horario : '+minegocio.horario+'\n'
-                        list += 'Direccion : '+minegocio.direccion+'\n'
+                        list += '*Estado :* '+miestado+'\n'
+                        list += '*Horario :* '+minegocio.horario+'\n'
+                        list += '*Direccion :* '+minegocio.direccion+'\n'
                         list += '----------------------------------'+'\n'
                         list += '*MENU DEL DIA*\n'
                         for (let index = 0; index < miresponse.data.length; index++) {
@@ -103,13 +101,9 @@ client.on('message', async msg => {
     
                         }
                         list += '----------------------------------'+'\n'        
-                        list += '*ENVIA UNA OPCION ejemplo: b1 o b2 ..*\n'
+                        list += '*ENVIA UNA OPCION ejemplo: b1 o b2 ..*'
                         var mimedia = minegocio.logo ? MessageMedia.fromFilePath('../../storage/app/public/'+minegocio.logo) : MessageMedia.fromFilePath('imgs/mitienda.png');
-                        client.sendMessage(msg.from, mimedia, {caption: list}).then((response) => {
-                            if (response.id.fromMe) {
-                                console.log("image fue enviado!");
-                            }
-                        })
+                        client.sendMessage(msg.from, mimedia, {caption: list})
                         break;
                     case (msg.body === 'B') || (msg.body === 'b'):
                         var miresponse = await axios(process.env.APP_URL+'api/productos')
@@ -141,17 +135,14 @@ client.on('message', async msg => {
                             list += '*DETALLE* .- '+miresponse.data.detalle+'\n'
                             list += '*PRECIO* .- '+miresponse.data.precio+' Bs.\n'
                             list += '--------------------------'+'\n'
-                            list += '*A'+miresponse.data.negocio.id+' - NEGOCIO* .- '+miresponse.data.negocio.nombre+'\n'
+                            list += '*A'+miresponse.data.negocio.id+'* .- '+miresponse.data.negocio.nombre.toUpperCase()+'\n'
                             list += '--------------------------'+'\n'
                             list += '*Y* .- AÑADIR A CARRITO\n'
-                            list += '*B* .- TODOS LOS PRODUCTOS\n'
+                            // list += '*B* .- TODOS LOS PRODUCTOS\n'
                             list += '*0* .- VOLVER A MENU PRINCIPAL\n'
                             list += '--------------------------'+'\n'
-                            list += '*ENVIA UNA OPCION ejemplo: y o b ..*'
-                            client.sendMessage(msg.from, media, {caption: list}).then((response) => {
-                                if (response.id.fromMe) {console.log("text fue enviado!")
-                                }
-                            })
+                            list += '*ENVIA UNA OPCION ejemplo: y*'
+                            client.sendMessage(msg.from, media, {caption: list})
                             carts.set(msg.from, miresponse.data.id)
                             break;
                     case (msg.body === 'C') || (msg.body === 'c'):
@@ -201,97 +192,82 @@ client.on('message', async msg => {
                         // socket.emit("chatbot", msg.from)
                         break;
                     case (msg.body === 'D') || (msg.body === 'd'):
-                        var midata = {
-                            chatbot_id: msg.from
-                        }
-                        var miresponse = await axios.post(process.env.APP_URL+'api/chatbot/cart/get', midata)
+                        var miresponse = await axios.post(process.env.APP_URL+'api/chatbot/cart/get', {chatbot_id: msg.from})
                         var micant = await axios(process.env.APP_URL+'api/pedido/carrito/negocios/'+msg.from)
                         if (miresponse.data.length != 0) {
                             var list = '🛒*Lista de productos en tu carrito*🛒 \n'
                             var total = 0
-                            list += '------------------------------------------ \n'
+                            list += '------------------------------------------\n'
                             for (let index = 0; index < miresponse.data.length; index++) {
-                                list += '*CODIGO* .- B'+miresponse.data[index].producto_id+' \n'
-                                list += '*NOMBRE* .- '+miresponse.data[index].producto.nombre+' \n'
-                                list += '*DETALLE* .- '+miresponse.data[index].producto.detalle+' \n'
+                                list += '*CODIGO* .- B'+miresponse.data[index].producto_id+'\n'
+                                list += '*NOMBRE* .- '+miresponse.data[index].producto.nombre+'\n'
+                                list += '*DETALLE* .- '+miresponse.data[index].producto.detalle+'\n'
                                 list += '*PRECIO* .- '+miresponse.data[index].producto.precio+' Bs.\n'
-                                list += '*CANTIDAD* .- '+miresponse.data[index].cantidad+' \n'
-                                list += '*NEGOCIO* .- '+miresponse.data[index].negocio_name+'\n'
+                                list += '*CANTIDAD* .- '+miresponse.data[index].cantidad+'\n'
+                                list += '*NEGOCIO* .- '+miresponse.data[index].negocio_name.toUpperCase()+'\n'
                                 list += '------------------------------------------ \n'
                                 total += miresponse.data[index].producto.precio * miresponse.data[index].cantidad
                             }
-                            list += '*-----TOTALES-----*\n'
                             list += '*PRODUCTOS* .- '+total+' Bs. \n'
-                            list += '*DELIVERY* .- '+(micant.data * process.env.COMISION)+' Bs. \n'
-                            list += '*TOTAL* .- '+(total + (micant.data * process.env.COMISION))+' Bs. \n'
-                            list += '------------------------------------------ \n'
-                            list += '*G* .- Enviar pedido \n'
-                            list += '*H* .- Vaciar Carrito \n'
+                            list += '*DELIVERY* .- '+(micant.data * process.env.COMISION)+' Bs.\n'
+                            list += '*TOTAL* .- '+(total + (micant.data * process.env.COMISION))+' Bs.\n'
+                            list += '------------------------------------------\n'
+                            list += '*G* .- REALIZAR PEDIDO\n'
+                            list += '*H* .- VACIAR CARRITO \n'
                             list += '*0* .- MENU PRINCIPAL \n'
-                            list += '*ENVIA UNA OPCION ejemplo: y o b ..*'
-                            client.sendMessage(msg.from, list).then((response) => {
-                                if (response.id.fromMe) {
-                                    console.log("text fue enviado!");
-                                }
-                            })
+                            list += '------------------------------------------\n'
+                            list += 'Tiempo aproximado de entrega: '+process.env.TIME+'\n'
+                            list += '------------------------------------------\n'
+                            list += '*ENVIA UNA OPCION ejemplo: g o h ..*'
+                            client.sendMessage(msg.from, list)
                         } else {
-                            client.sendMessage(msg.from, '❌ *Tu carrito esta vacio* ❌ \n *0* .- MENU PRINCIPAL').then((response) => {
-                                if (response.id.fromMe) {
-                                    console.log("text fue enviado!");
-                                }
-                            })
+                            client.sendMessage(msg.from, '❌ *Tu carrito esta vacio* ❌ \n *0* .- MENU PRINCIPAL')
                         }
                         break;
                     case pasarelas.has(msg.body.toUpperCase()): // FIN DEL FLUJO
                         var miresponse = await axios.post(process.env.APP_URL+'api/chatbot/cart/get', {chatbot_id: msg.from})
                         if (miresponse.data.length != 0) {
-                            var micliente = await axios(process.env.APP_URL+'api/cliente/'+msg.from)
-                            var mediag = MessageMedia.fromFilePath('imgs/gracias.gif')
-                      
-                            //registro del pedido-----
+                            //registro del pedido--------
                             var midata = {
                                 chatbot_id: msg.from,
                                 pago_id: msg.body.substring(1, 99),
                                 cliente_id: micliente.data.id,
                                 ubicacion_id: locations.get(msg.from)
                             }
-                            var miventa = await axios.post(process.env.APP_URL+'api/chatbot/venta/save', midata)
-                            // set.pedidos(miventa.data.chatbot_id, miventa.data.id)
-                            var list = '🕦 *Pedido #'+miventa.data.id+' Enviado* 🕦 \n Se te notificará el proceso de tu pedido, por este mismo medio. \n 🎉 *GRACIAS POR TU PREFERENCIA* \n🎉'
+                            var newpedido = await axios.post(process.env.APP_URL+'api/pedido/save', midata)
+                            //BANYPAY--------------------------------                                      
+                            var micart = []
+                            for (let index = 0; index < newpedido.data.productos.length; index++) {
+                                micart.push({"concept": newpedido.data.productos[index].producto_name, "quantity": newpedido.data.productos[index].cantidad, "unitPrice": newpedido.data.productos[index].precio})
+                            }
+                            var miconfig = {
+                                    "affiliateCode": process.env.BANIPAY_CODE,
+                                    "notificationUrl": "#",
+                                    "withInvoice": false,
+                                    "externalCode": newpedido.data.id,
+                                    "paymentDescription": "Pago por servicios de Transporte (GoDelivery)",
+                                    "details": micart,
+                                    "postalCode": "Bolivianos"
+                                  }
+                            var banipay = await axios.post('https://banipay.me:8443/api/payments/transaction', miconfig)
+                            await axios.post(process.env.APP_URL+"api/banipay/save", {paymentId: banipay.data.paymentId, transactionGenerated: banipay.data.transactionGenerated, externalCode: banipay.data.externalCode})
+
+                            var mipedido = await axios(process.env.APP_URL+'api/pedido/'+newpedido.data.id)
+
+                            //Responder al cliente por su compra-------------------------
+                            var list = '🕦 *Pedido #'+mipedido.data.id+' Enviado* 🕦 \n Se te notificará el proceso de tu pedido, por este mismo medio. \n 🎉 *GRACIAS POR TU PREFERENCIA* 🎉\n'
                             list += '------------------------------------------\n'
-                            list += 'envia la la palabra perfil, para ver tus pedidos'
-                            client.sendMessage(msg.from, mediag, {caption: list}).then((response) => {
-                                if (response.id.fromMe) {
-                                    console.log("text fue enviado!");
-                                }
-                            })
-    
-                            //var mipedido = axios(process.env.APP_URL+'api/pedido/'+miventa.data.id) 
-                            //crear banipay del pedido-----
-                            // var micart = []
-                            // for (let index = 0; index < miresponse.data.length; index++) {
-                            //     micart.push({"concept": miresponse.data[index].name, "quantity": miresponse.data[index].cant, "unitPrice": miresponse.data[index].precio})
-                            // }
-                            // var miconfig = {
-                            //         "affiliateCode": process.env.BANIPAY_CODE,
-                            //         "notificationUrl": "#",
-                            //         "withInvoice": false,
-                            //         "externalCode": miventa.data.id,
-                            //         "paymentDescription": "Pago por servicios de DELIVERY",
-                            //         "details": [],
-                            //         "postalCode": "Bolivianos"
-                            //       }
-                            //  var banipay = await axios.post('https://banipay.me:8443/api/payments/transaction', miconfig)
-                            //https://banipay.me/super/payment
-    
-                            //PEDIDO DEL CLIENTE (estaba antes en ENVIAR PEDIDOS A MENSAJEROS)
-                            var mipedido = await axios(process.env.APP_URL+'api/pedido/'+miventa.data.id)
-    
-    
-                            //ENVIAR PEDIDOS A NEGOCIOS----
-    
-                            //Lógica para Agrupar Negocios
-                            var negocios3= await axios(process.env.APP_URL+'api/pedido/negocios/'+miventa.data.id)
+                            list += 'Link de Pago *(opcional)*\n'
+                            list += 'https://banipay.me/super/payment'+mipedido.data.banipay.urlTransaction+'\n'
+                            list += '------------------------------------------\n'
+                            list += 'Ingresa al link de pago si deseas pagar por internet *(100% seguro)*, para cualquier consulta o duda. puede llamar al administrador\n'
+                            var mediag = MessageMedia.fromFilePath('imgs/gracias.gif')
+                            client.sendMessage(msg.from, mediag, {caption: list})
+                            // var admin = await client.getContactById(process.env.CHATBOT)
+                            // client.sendMessage(msg.from, admin)
+
+                            //Lógica para Agrupar Negocios--------------------------
+                            var negocios3= await axios(process.env.APP_URL+'api/pedido/negocios/'+mipedido.data.id)
                             var send_negocios = []
                             var searchrep = []
                             for (let index = 0; index < negocios3.data.length; index++) {
@@ -309,127 +285,93 @@ client.on('message', async msg => {
                                 }
                                 searchrep.push(negocios3.data[index].negocio.id)
                             }
-                            // send_negocios=await negocios_pedido(miventa.data.id)
                             
-                            //Lógica para Agrupar y enviar Pedidos por Negocio
+                            //Lógica para Agrupar y enviar Pedidos por Negocio----------------------
                             for (let index = 0; index < send_negocios.length; index++) {
                                 var total_pedido_actual=0;
                                 var mismg=''
-                                mismg += 'Hola, '+negocios3.data[index].negocio_name+' tienes un pedido solicitado, con el siguiente detalle: \n'
+                                mismg += 'Hola, *'+negocios3.data[index].negocio_name+'* tienes un pedido solicitado, con el siguiente detalle: \n'
                                 mismg += '------------------------------------------\n'
-                                mismg += 'Pedido #: '+negocios3.data[index].pedido_id+'\n'
-                                mismg += 'Cliente: '+mipedido.data.cliente.nombre+'\n'
-                                mismg += 'Fecha: '+negocios3.data[index].published+'\n'
+                                mismg += '*Pedido #:* '+negocios3.data[index].pedido_id+'\n'
+                                mismg += '*Cliente:* '+mipedido.data.cliente.nombre+'\n'
+                                mismg += '*Fecha:* '+negocios3.data[index].published+'\n'
                                 mismg += '------------------------------------------\n'
                                 for (let j = 0; j < negocios3.data.length; j++) {
                                     if (send_negocios[index].id== negocios3.data[j].negocio.id) {
                                         total_pedido_actual+=negocios3.data[j].total
-                                        mismg += 'Producto: '+negocios3.data[j].producto_name+'\n'
-                                        mismg += 'Cantidad: '+negocios3.data[j].cantidad+'\n'
-                                        mismg += 'Precio: '+negocios3.data[j].precio+' Bs.\n'
-                                        mismg += 'SubTotal: '+negocios3.data[j].total+' Bs.\n'
+                                        mismg += '*Producto:* '+negocios3.data[j].producto_name+'\n'
+                                        mismg += '*Cantidad:* '+negocios3.data[j].cantidad+'\n'
+                                        mismg += '*Precio:* '+negocios3.data[j].precio+' Bs.\n'
+                                        mismg += '*SubTotal:* '+negocios3.data[j].total+' Bs.\n'
                                         mismg += '------------------------------------------\n'
                                         var telef_negocio=negocios3.data[j].negocio.telefono
                                         var telef_negocio='591'+telef_negocio+'@c.us'
                                     }
                                 }
-                                mismg += 'Total: '+total_pedido_actual+' Bs.\n'
+                                mismg += '*Total:* '+total_pedido_actual+' Bs.\n'
+                                mismg += '------------------------------------------\n'
                                 mismg += 'La asignación a un Delivery está en proceso, ve realizando el pedido porfavor.'
-                                client.sendMessage(telef_negocio, mismg).then((response) => {
-                                    if (response.id.fromMe) {
-                                        console.log("text fue enviado!");
-                                    }
-                                })
+                                client.sendMessage(telef_negocio, mismg)
                             }
-    
-                            //ENVIAR PEDIDOS A MENSAJEROS-----
+
+                            //ENVIAR PEDIDOS A MENSAJEROS-------------------------
                             ubic_cliente=''
                             ubic_cliente +='Ubicación del Cliente: '+mipedido.data.cliente.nombre+'\n'
                             ubic_cliente +=mipedido.data.ubicacion.detalles
                             const locationcliente = new Location(mipedido.data.ubicacion.latitud, mipedido.data.ubicacion.longitud, ubic_cliente);
                             var mensajeroslibre = await axios(process.env.APP_URL+'api/mensajeros/libre')
-                           
-                            console.log(mensajeroslibre.data)
                             for (let index = 0; index < mensajeroslibre.data.length; index++) {   
                                 var total_mensajero = 0
                                 var cantidad_mensajero = 0 
                                 var mitext = '' 
-                                mitext += 'Hola, '+mensajeroslibre.data[index].nombre+' hay un pedido disponible con el siguiente detalle:\n'                       
+                                mitext += 'Hola, *'+mensajeroslibre.data[index].nombre+'* hay un pedido disponible con el siguiente detalle:\n'                       
                                 mitext += '------------------------------------------\n'
-                                mitext += 'ID: '+mipedido.data.id+'\n'
-                                mitext += 'Cliente: '+mipedido.data.cliente.nombre+'\n'
-                                mitext += 'Fecha: '+mipedido.data.published+'\n'
+                                mitext += '*ID:* '+mipedido.data.id+'\n'
+                                mitext += '*Cliente:* '+mipedido.data.cliente.nombre+'\n'
+                                mitext += '*Fecha:* '+mipedido.data.published+'\n'
                                 mitext += '----- *PRODUCTOS* -----\n'
                                 for (let j = 0; j < mipedido.data.productos.length; j++) {
-                                    mitext += 'NOMBRE: '+mipedido.data.productos[j].producto_name+'\n'
-                                    mitext += 'PRECIO : '+mipedido.data.productos[j].precio+' Bs.\n'
-                                    mitext += 'CANT : '+mipedido.data.productos[j].cantidad+'\n'
-                                    mitext += 'NEGOCIO : '+mipedido.data.productos[j].negocio_name+'\n\n'
+                                    mitext += '*NOMBRE:* '+mipedido.data.productos[j].producto_name+'\n'
+                                    mitext += '*PRECIO:* '+mipedido.data.productos[j].precio+' Bs.\n'
+                                    mitext += '*CANT:* '+mipedido.data.productos[j].cantidad+'\n'
+                                    mitext += '*NEGOCIO:* '+mipedido.data.productos[j].negocio_name+'\n\n'
                                     total_mensajero += mipedido.data.productos[j].total 
                                     cantidad_mensajero += mipedido.data.productos[j].cantidad
                                 }
                                 mitext += '----- *TOTALES* -----\n'
-                                mitext += 'Productos: '+cantidad_mensajero+'\n'
-                                mitext += 'Delivery: '+((send_negocios.length)*process.env.COMISION)+'\n'
-                                mitext += 'Total: '+(total_mensajero+((send_negocios.length)*process.env.COMISION))+' Bs.\n'
-                                mitext += '------------------------------------------\n'
-                               
-                                client.sendMessage(mensajeroslibre.data[index].telefono, mitext).then((response) => {
-                                    if (response.id.fromMe) {
-                                        console.log("text fue enviado!");
-                                    }
-                                })
-    
+                                mitext += '*Productos:* '+cantidad_mensajero+'\n'
+                                mitext += '*Negocios:* '+send_negocios.length+'\n'
+                                mitext += '*Delivery:* '+((send_negocios.length)*process.env.COMISION)+' Bs.\n'
+                                mitext += '*Total:* '+(total_mensajero+((send_negocios.length)*process.env.COMISION))+' Bs.'
+                                client.sendMessage(mensajeroslibre.data[index].telefono, mitext)
+                                
+                                //enviando pedido a negocios------------------------------
                                 for (let j = 0; j < send_negocios.length; j++) {
                                     var mitexto=''
                                     mitexto +='Ubicación del Negocio: '+send_negocios[j].nombre+'\n'
-                                    // client.sendMessage(mensajeroslibre.data[index].telefono, mitexto).then((response) => {
-                                    //     if (response.id.fromMe) {
-                                    //         console.log("text fue enviado!");
-                                    //     }
-                                    // })
-                                    mitexto +=send_negocios[j].direccion   
-                                    const locationnegocio = new Location(parseFloat(send_negocios[j].latitud), parseFloat(send_negocios[j].longitud), mitexto);
-                                    client.sendMessage(mensajeroslibre.data[index].telefono, locationnegocio).then((response) => {
-                                        if (response.id.fromMe) {
-                                            console.log("ubicacion fue enviada!");
-                                        }
-                                    })
+                                    mitexto +=send_negocios[j].direccion
+                                    client.sendMessage(mensajeroslibre.data[index].telefono, new Location(parseFloat(send_negocios[j].latitud), parseFloat(send_negocios[j].longitud), mitexto))
                                 }
-                               
-                                client.sendMessage(mensajeroslibre.data[index].telefono, locationcliente).then((response) => {
-                                    if (response.id.fromMe) {
-                                        console.log("ubicacion fue enviada!");
-                                    }
-                                })
-    
+                                client.sendMessage(mensajeroslibre.data[index].telefono, locationcliente)
                                 var mitext = '' 
                                 mitext += '*QUIERES TOMAR EL PEDIDO #'+mipedido.data.id+' ?* \n'
-                                mitext += 'Envia  *='+mipedido.data.id+'* para confirmar. \n'
-                                client.sendMessage(mensajeroslibre.data[index].telefono, mitext).then((response) => {
-                                    if (response.id.fromMe) {
-                                        console.log("text fue enviado!");
-                                    }
-                                })
-    
-                                // client.sendMessage(mensajeroslibre.data[index].telefono, new Buttons('Body text/ MessageMedia instance', [{id:'customId',body:'button1'},{body:'button2'},{body:'button3'},{body:'button4'}], 'Title here, doesn\'t work with media', 'Footer here'), {caption: 'if you used a MessageMedia instance, use the caption here'})
-    
-                                // client.sendMessage(mensajeroslibre.data[index].telefono, new List('Body text/ MessageMedia instance', 'List message button text', [{title: 'sectionTitle', rows: [{id: 'customId', title: 'ListItem2', description: 'desc'}, {title: 'ListItem2'}]}], 'Title here, doesn\'t work with media', 'Footer here'), {caption: 'if you used a MessageMedia instance, use the caption here'})
+                                mitext += 'Envia *='+mipedido.data.id+'* para confirmar.'
+                                client.sendMessage(mensajeroslibre.data[index].telefono, mitext)
                             }
+                            var admin = await client.getContactById(process.env.CHATBOT)
+                            client.sendMessage(msg.from, admin)
                             }else {
-                                client.sendMessage(msg.from, '❌ *Tu carrito esta vacio* ❌ \n *0* .- MENU PRINCIPAL').then((response) => {
-                                    if (response.id.fromMe) {
-                                        console.log("text fue enviado!");
-                                    }
-                                })
+                                client.sendMessage(msg.from, '❌ *Tu carrito esta vacio* ❌ \n *0* .- MENU PRINCIPAL')
                             }
                         break;
                     case (msg.body === 'G') || (msg.body === 'g'):
                         var micart = await axios.post(process.env.APP_URL+'api/chatbot/cart/get', {chatbot_id: msg.from})
                         if (micart.data.length != 0)
                         {
-                            var mimedia = MessageMedia.fromFilePath('../../storage/app/public/location.jpg')
-                            client.sendMessage(msg.from, mimedia, {caption: '🗺️ Genial, ahora necesitamos tu ubicacion, para enviar tu pedido 🗺️\nEnvia tu ubicacion actual (un mapa) por favor.'}).then((response) => {
+                            // var mimedia = MessageMedia.fromFilePath('../../storage/app/public/location.jpg')
+                            var list = '🗺️ Genial, ahora necesitamos tu ubicacion, para enviar tu pedido 🗺️\nEnvia tu ubicacion actual (un mapa) por favor\n'
+                            list += 'Si ya enviaste un mapa anteriormente, puedes enviar *(p1 o p2)*'
+                            client.sendMessage(msg.from, list).then((response) => {
                                 if (response.id.fromMe) {
                                     console.log("text fue enviado!");
                                 }
@@ -443,48 +385,27 @@ client.on('message', async msg => {
                         }
                         break;
                     case (msg.body === 'H') || (msg.body === 'h'):
-                        var midata = {
-                            chatbot_id: msg.from
-                        }
-                    await axios.post(process.env.APP_URL+'api/chatbot/cart/clean', midata)
-                        client.sendMessage(msg.from, '❌ *Tu carrito esta vacio* ❌ \n *0* .- MENU PRINCIPAL').then((response) => {
-                            if (response.id.fromMe) {
-                                console.log("text fue enviado!");
-                            }
-                        })
+                        await axios.post(process.env.APP_URL+'api/chatbot/cart/clean', {chatbot_id: msg.from})
+                        client.sendMessage(msg.from, '❌ *Tu carrito esta vacio* ❌ \n *0* .- MENU PRINCIPAL')
                         break;
                     case (msg.body === 'y') || (msg.body === 'Y'):
-                        client.sendMessage(msg.from, 'Genial ✌, Ingresa una cantidad para agragar a tu carrito\ncon el formato: *+1 o +2 ..*').then((response) => {
-                            if (response.id.fromMe) {
-                                console.log("text fue enviado!");
-                            }
-                        })
+                        client.sendMessage(msg.from, 'Genial ✌, Ingresa una cantidad para agragar a tu carrito\ncon el formato: *+1 o +2 ..*')
                         break;
-                    case (msg.body === 'v') || (msg.body === 'V'):
-                        const mediav = await MessageMedia.fromUrl('https://delivery.appxi.net//storage/videos/demostrativo.mp4');
-                        client.sendMessage(msg.from, mediav).then((response) => {
-                            if (response.id.fromMe) {
-                                console.log("text fue enviado!");
-                            }
-                        })
-                        break;
-                    case (msg.body === 'm') || (msg.body === 'M'):
+                    case (msg.body === 'm') || (msg.body === 'M'): //NEGOCIO
                         var minegocio = await axios(process.env.APP_URL+'api/minegocio/'+msg.from)
-                        console.log(minegocio.data)
                         if (minegocio.data) {
                             menu_negocio(minegocio, msg.from)
                         } else {
                             client.sendMessage(msg.from, 'No tiene registrado un negocio con nosotros, contactese con el administrador')
-                            client.sendMessage(msg.from, process.env.CHATBOT)
-                        }
-                        
+                            var admin = await client.getContactById(process.env.CHATBOT)
+                            client.sendMessage(msg.from, admin)
+                        }                        
                         break;
                     case (msg.body.substring(0, 1) === '+'):           
                         var cant = msg.body.substring(1, 99)
                         var product_id = carts.get(msg.from)
                         var product = await axios(process.env.APP_URL+'api/producto/'+product_id)
                         var minegocio = await axios(process.env.APP_URL+'api/negocio/'+product.data.negocio.id)
-                        console.log(minegocio.data.estado)
                         if (minegocio.data.estado === '1') {            
                             var midata = {
                                 product_id: product.data.id,
@@ -499,21 +420,13 @@ client.on('message', async msg => {
                             var list = '🎉 Producto agregado a tu carrito 🎉\n'
                             list += '------------------------------------------\n'
                             list += '*D* .- VER MI CARRITO\n'
-                            list += '*G* .- Enviar pedido\n'
-                            list += '*0* .- MENU PRINCIPAL\n'
+                            list += '*G* .- SOLICITAR PEDIDO\n'
+                            // list += '*0* .- MENU PRINCIPAL\n'
                             list += '------------------------------------------\n'
-                            list += '*ENVIA UNA OPCION ejemplo: f o g ..*'
-                            client.sendMessage(msg.from, list).then((response) => {
-                                if (response.id.fromMe) {
-                                    console.log("text fue enviado!");
-                                }
-                            })
+                            list += '*ENVIA UNA OPCION ejemplo: d o g ..*'
+                            client.sendMessage(msg.from, list)
                         } else {
-                            client.sendMessage(msg.from, '❌Lo lamento el negocio esta cerrado❌').then((response) => {
-                                if (response.id.fromMe) {
-                                    console.log("text fue enviado!");
-                                }
-                            })
+                            client.sendMessage(msg.from, '❌Lo lamento el negocio esta cerrado❌')
                         }
                         break;
                     case (msg.body === 'E') || (msg.body === 'e') || (msg.body === 'Perfil') || (msg.body === 'perfil') || (msg.body === 'miperfil') || (msg.body === 'Miperfil') || (msg.body === 'Mi Perfil') || (msg.body === 'mi perfil'):
@@ -522,23 +435,21 @@ client.on('message', async msg => {
                         list += '------------------------------------------\n'
                         list += 'ID : '+miperfil.data.id+'\n'
                         list += 'Nombres : '+miperfil.data.nombre+'\n'
-                        list += 'Telefono : '+miperfil.data.chatbot_id+'\n'
+                        list += 'Localidad : '+miperfil.data.localidad.nombre+'\n'
+                        list += 'Chatbot : '+miperfil.data.chatbot_id+'\n'
+                        list += 'Registrado : '+miperfil.data.published+'\n'
+                        list += 'Pedidos : '+miperfil.data.pedidos.length+'\n'
+                        list += 'Mapas : '+miperfil.data.ubicaciones.length+'\n'
                         list += '------------------------------------------\n'
-                        list += '*✍️* .- Historial de Pedidos\n'
-                        list += '------------------------------------------\n'
-                        client.sendMessage(msg.from, list).then((response) => {
-                            if (response.id.fromMe) {
-                                console.log("text fue enviado!");
-                            }
-                        })
+                        list += process.env.APP_URL+'mispedidos/'+msg.from
+                        client.sendMessage(msg.from, list)
                         break;
                     case (msg.body.substring(0, 1) === '#'):
                         var midescription = msg.body.substring(1, 99)
                         var milocation = locations.get(msg.from)
-                        await axios.post(process.env.APP_URL+'api/ubicacion/update', {id: milocation, detalle: midescription})
-                        
+                        await axios.post(process.env.APP_URL+'api/ubicacion/update', {id: milocation, detalle: midescription})                        
                         var pagos = await axios(process.env.APP_URL+'api/chatbot/pasarelas/get')
-                        var list = '*Gracias, PUEDES PAGAR TU PEDIDO POR ESTOS METODOS*\n'
+                        var list = '*PUEDES PAGAR TU PEDIDO POR ESTOS METODOS*\n'
                         list += '------------------------------------------ \n'
                         for (let index = 0; index < pagos.data.length; index++) {
                             list += '*P'+pagos.data[index].id+'* .- '+pagos.data[index].title+'\n'
@@ -546,11 +457,7 @@ client.on('message', async msg => {
                         }
                         list += '------------------------------------------ \n'
                         list += 'Genial ✌ como quieres pagar tu pedido ? envia *p1 o p2* .. para confirmar tu pedido.'
-                        client.sendMessage(msg.from, list).then((response) => {
-                            if (response.id.fromMe) {
-                                console.log("text fue enviado!");
-                            }
-                        })
+                        client.sendMessage(msg.from, list)
                         break;
                     //Estado del Pedido Asignado
                     case (msg.body.substring(0, 1) === '='):
@@ -561,21 +468,21 @@ client.on('message', async msg => {
                         }
                         var asignar = await axios.post(process.env.APP_URL+'api/asignar/pedido', midata)
                         if (asignar.data) {
-                            var mitext=''
-                            mitext+= 'Pedido #'+midescription+' Asignado Correctamente\n'
+                            var mitext='🎉Felicidades se te fue asignado el PEDIDO #'+midescription+'🎉\n'
+                            mitext+= '------------------------------------------\n'
+                            // mitext+= 'Pedido #'+midescription+' Asignado Correctamente\n'
                             mitext+= 'Porfavor, proceda a ir lo antes posible a recoger el pedido a los negocios respectivos\n'
                             mitext+= 'Una vez que tenga el pedido completo, envíe */'+midescription+'* para confirmar el estado.\n'
-                            mitext+= 'Luego envíe su *Ubicación en Tiempo Real* al Cliente porfavor\n'
+                            // mitext+= 'Luego envíe su *Ubicación en Tiempo Real* al Cliente porfavor\n'
                             mitext+= '------------------------------------------\n'
                             mitext+= 'Envíe: *?* seguido de una descripción para cancelar su servicio por algún motivo si es que fue antes de recoger el pedido.\n'
                             mitext+= 'Ejemplo: *?Se me pinchó la llanta*\n'
                             mitext+= 'Si ya recogió el pedido usted tiene total responsabilidad del mismo.\n'
-                        
-                            client.sendMessage(msg.from, mitext).then((response) => {
-                                if (response.id.fromMe) {
-                                    console.log("text fue enviado!");
-                                }
-                            })
+                            mitext+= '------------------------------------------\n'
+                            mitext+= 'Envíe tu *Ubicación en Tiempo Real* al cliente, para iniciar el viaje porfavor.'                                 
+                            client.sendMessage(msg.from, mitext)
+
+                            //notificacion al cliente
                             var pedido= await axios(process.env.APP_URL+'api/pedido/'+midescription)
                             var contacto_cliente= await client.getContactById(pedido.data.cliente.chatbot_id)
                             client.sendMessage(msg.from, contacto_cliente);
@@ -583,22 +490,15 @@ client.on('message', async msg => {
                             mitext += 'Su pedido fue asignado al Delivery: '+pedido.data.mensajero.nombre+'\n'
                             mitext += 'Le avisaremos cuando el Delivery tenga su Pedido\n'
                             mitext += 'Una vez le llegue el pedido, envíe *%'+midescription+'* para confirmar porfavor.\n'
-                            client.sendMessage(pedido.data.chatbot_id, mitext).then((response) => {
-                                if (response.id.fromMe) {
-                                    console.log("text fue enviado!");
-                                }
-                            })
+                            client.sendMessage(pedido.data.chatbot_id, mitext)
     
+                            //notificacion a los negocios 
                             var send_negocios= await negocios_pedido(midescription)
                             for (let index = 0; index < send_negocios.length; index++) {
                                 mitext= ''
                                 mitext+= 'El Delivery: '+pedido.data.mensajero.nombre+' será el encargado de recoger el pedido #'+midescription+'\n'
                                 var telefono_negocio= '591'+send_negocios.data[index].telefono+'@c.us'
-                                client.sendMessage(telefono_negocio, mitext).then((response) => {
-                                    if (response.id.fromMe) {
-                                        console.log("text fue enviado!");
-                                    }
-                                })                            
+                                client.sendMessage(telefono_negocio, mitext)                           
                             }
                         } else {
                             client.sendMessage(msg.from, 'El pedido #'+midescription+' ya está asignado a otro Delivery, intenta con otro pedido.').then((response) => {
@@ -608,8 +508,7 @@ client.on('message', async msg => {
                             })
                         }
     
-                        break;
-    
+                        break;    
                     //Estado del Pedido Cancelado
                     case (msg.body.substring(0, 1) === '?'):
                         var midescription = msg.body.substring(1, 99)
@@ -664,54 +563,42 @@ client.on('message', async msg => {
                     case (msg.body.substring(0, 1) === '/'):
                         var midescription = msg.body.substring(1, 99)
                         var pedido= await axios(process.env.APP_URL+'api/llevando/pedido/'+midescription)
-                        var mitext=''
-                        mitext += 'Hola '+pedido.data.mensajero.nombre+'\n'
+                        var mitext = 'Hola *'+pedido.data.mensajero.nombre+'*\n'
                         mitext += 'recogiste el pedido y lo estás llevando hasta el cliente '+pedido.data.cliente.nombre+'\n'
                         mitext += 'Una vez sea entregado correctamente envíe *%'+pedido.data.id+'* para confirmar porfavor.\n'
-                        client.sendMessage(msg.from, mitext).then((response) => {
-                            if (response.id.fromMe) {
-                                console.log("text fue enviado!");
-                            }
-                        })
+                        client.sendMessage(msg.from, mitext)
                         mitext=''
-                        mitext += 'Su pedido ya fue entregado a su Delivery asignado y está siendo llevado a su Domicilio.\n'
+                        mitext += 'Su pedido *#'+pedido.data.id+'* ya fue entregado a su Delivery asignado y está siendo llevado a su Domicilio.\n'
                         mitext += 'Porfavor, esté atento.\n'
-                        mitext += 'Una vez le llegue el pedido envíe *%'+pedido.data.id+'* para confirmar porfavor.\n'
+                        mitext += 'Una vez le llegue el pedido envíe *%'+pedido.data.id+'* para confirmar porfavor.'
                         client.sendMessage(pedido.data.chatbot_id, mitext).then((response) => {
                             if (response.id.fromMe) {
                                 console.log("text fue enviado!");
                             }
                         })
                         break;
-    
                     //Estado del Pedido Entregado
                     case (msg.body.substring(0, 1) === '%'):
                         var midescription = msg.body.substring(1, 99)
                         var pedido= await axios(process.env.APP_URL+'api/entregando/pedido/'+midescription)
     
                         var mitext=''
-                        mitext += 'Hola '+pedido.data.mensajero.nombre+'\n'
+                        mitext += 'Hola, *'+pedido.data.mensajero.nombre+'*\n'
                         mitext += 'El pedido #'+midescription+' fue entregado al cliente '+pedido.data.cliente.nombre+' correctamente\n'
                         mitext += 'Estás libre y habilitado para realizar mas Deliverys.\n'
-                        client.sendMessage(pedido.data.mensajero.telefono, mitext).then((response) => {
-                            if (response.id.fromMe) {
-                                console.log("text fue enviado!");
-                            }
-                        })
+                        client.sendMessage(pedido.data.mensajero.telefono, mitext)
                         menu_mensajero(pedido.data.mensajero.telefono)
+                        
+                        //notificacion al cliente
                         mitext=''
                         mitext += 'Su pedido ya fue entregado a su persona en su Domicilio.\n'
                         mitext += 'Esperamos que el servicio haya sido de su agrado.\n'
                         mitext += 'Que tenga Buen provecho le desea Go Delivery.\n'
                         mitext += '------------------------------------------ \n'
                         mitext += 'Si tienes alguna queja o sugerencia puedes enviarla de la siguiente forma:\n'
-                        mitext += 'Ejemplo 1: &Mi pedido llegó...\n'
-                        mitext += 'Ejemplo 2: &Quisiera que adicionen a su servicio...'
-                        client.sendMessage(pedido.data.chatbot_id, mitext).then((response) => {
-                            if (response.id.fromMe) {
-                                console.log("text fue enviado!");
-                            }
-                        })
+                        mitext += '*Ejemplo 1:* &Mi pedido llegó...\n'
+                        mitext += '*Ejemplo 2:* &Quisiera que adicionen a su servicio...'
+                        client.sendMessage(pedido.data.chatbot_id, mitext)
                         break;
                     //Queja o sugerencia del Pedido
                     case (msg.body.substring(0, 1) === '&'):
@@ -723,87 +610,40 @@ client.on('message', async msg => {
                         var pedido_comentario= await axios.post(process.env.APP_URL+'api/pedido/comentario', midata)
                         if (pedido_comentario.data) {
                             var mitext=''
-                            mitext+= 'Su comentario: '+midescription+' respecto a su pedido #'+pedido_comentario.data.id+' \n'
+                            mitext+= 'Su comentario: *'+midescription+'* respecto a su pedido *#'+pedido_comentario.data.id+'*\n'
                             mitext+= 'fue registrado exitosamente y se le dará respuesta lo mas pronto posible.\n'
-                            mitext+= 'Gracias por utilizar Go Delivery\n'
-                            client.sendMessage(msg.from, mitext).then((response) => {
-                                if (response.id.fromMe) {
-                                    console.log("text fue enviado!");
-                                }
-                            })
+                            mitext+= 'Gracias por utilizar *GoDelivery*'
+                            client.sendMessage(msg.from, mitext)
+
                         } else {
                             var mitext=''
                             mitext+= 'Hola, de momento no tienes pedidos registrados, puedes realizar uno cuando gustes.\n'
                             mitext+= 'Envía: Hola para ver el Menú Principal\n'
-                            client.sendMessage(msg.from, mitext).then((response) => {
-                                if (response.id.fromMe) {
-                                    console.log("text fue enviado!");
-                                }
-                            })
+                            client.sendMessage(msg.from, mitext)
+                            menu_principal(micliente, msg.from)
                         }
                         break;
                     case (msg.body === 'test'):
-    
-                            break;
-                    case (msg.body === 'boton'):
-                        var button2 = new Buttons("teste", [{id: "event_yes", body: "SI"}, {id: "event_no", body: "NO"}], "hola! Evento", "Seleciona una opcion")
-                        client.sendMessage(msg.from, button2);
-                        break;
-                    case (msg.body === 'mapa'):
-                        const location = new Location(-14.5651251, -64.5648484, 'mi mapa');
-                        client.sendMessage(msg.from, location);
+                        await axios.post(process.env.APP_URL+"api/banipay/save", {paymentId: '520860', transactionGenerated: 'a904adfe26d74ab7a989568e94522888', externalCode: 17})
                         break;
                     case (msg.body === 'f') || (msg.body === 'F'):
                         menu_mensajero(msg.from)
                         break;
-                    case (msg.body === '🤝'):
+                    case (msg.body === '🔃'):
                         await axios(process.env.APP_URL+'api/mensajero/update/'+msg.from)
-                        client.sendMessage(msg.from, 'Estado Cambiado').then((response) => {
-                            if (response.id.fromMe) {
-                                console.log("text fue enviado!");
-                                menu_mensajero(msg.from)
-                            }
-                        })
+                        client.sendMessage(msg.from, 'Estado Cambiado')
+                        menu_mensajero(msg.from)
+                        break;
+                    case (msg.body === 'ℹ️'):
+                        // var minegocio = await axios(process.env.APP_URL+'api/negocio/update/'+msg.from)
+                        client.sendMessage(msg.from, 'Somos un servicio de mensajaeria(delivery) todo por whatsapp, donde podras realizar tus compras a los negocios de tu preferiencia, para mas informacion visita nuestra pagina web.')
+                        client.sendMessage(msg.from, process.env.APP_URL+'nosotros')
+                        menu_negocio(minegocio, msg.from)
                         break;
                     case (msg.body === '🔄'):
                         var minegocio = await axios(process.env.APP_URL+'api/negocio/update/'+msg.from)
-                        client.sendMessage(msg.from, 'Estado Cambiado').then((response) => {
-                            if (response.id.fromMe) {
-                                console.log("text fue enviado!");
-                                // menu_mensajero(msg.from)
-                                menu_negocio(minegocio, msg.from)
-                            }
-                        })
-                        break;
-                    case (msg.body === '🤟'):
-                        var mipedidos = await axios(process.env.APP_URL+'api/mensajero/pedidos/'+msg.from)
-                        console.log(mipedidos.data)
-                        var list = '*🛒 PEDIDOS ASIGNADOS 🛒* \n'
-                        list += '----------------------------------'+' \n'
-                        for (let index = 0; index < mipedidos.data.length; index++) {
-                            // const element = array[index];
-                            list += '*ID:* '+mipedidos.data[index].id+' \n'
-                            list += '*Fecha:* '+mipedidos.data[index].published+' \n'
-                            list += '*Estado:* '+mipedidos.data[index].estado.nombre+' \n'
-                            list += '*Cliente:* '+mipedidos.data[index].cliente.nombre+' \n'
-                            list += '*Pasarela:* '+mipedidos.data[index].pasarela.title+' \n'
-                            list += '*-----Productos-----*\n'
-                            for (let j = 0; j < mipedidos.data[index].productos.length; j++) {
-                                list += '----- *ID* :'+(j+1)+'-----\n'
-                                // list += '*ID* : '+mipedidos.data[index].productos[j].producto_id+'\n'
-                                list += '*Nombre* : '+mipedidos.data[index].productos[j].producto_name+'\n'
-                                list += '*Precio* : '+mipedidos.data[index].productos[j].precio+'\n'
-                                list += '*Cantidad* : '+mipedidos.data[index].productos[j].cantidad+'\n'
-                            }
-                            list += '------------------------------------------\n'
-                            // list += '*Total* : '+mipedidos.data[index].productos[j].cantidad+'\n'
-                            // list += '*Cantidad* : '+mipedidos.data[index].productos[j].cantidad+'\n'
-                        }
-                        client.sendMessage(msg.from, list).then((response) => {
-                            if (response.id.fromMe) {
-                                console.log("text fue enviado!");
-                            }
-                        })
+                        client.sendMessage(msg.from, 'Estado Cambiado')
+                        menu_negocio(minegocio, msg.from)
                         break;
                     default:
                     break;
@@ -821,17 +661,9 @@ client.on('message', async msg => {
                     var miubicacion = await axios.post(process.env.APP_URL+'api/ubicacion/save', midata)
                     locations.set(msg.from, miubicacion.data.id)
     
-                    client.sendMessage(msg.from, 'Para poder llegar mas rapido tu ubicacion (mapa), envia una descripcion de tu locacion, ejemplo: *#lado del tanque elevado*\npor delante el simbolo *#*').then((response) => {
-                        if (response.id.fromMe) {
-                            console.log("text fue enviado!");
-                        }
-                    })
+                    client.sendMessage(msg.from, 'Gracias, Para poder llegar mas rapido tu ubicacion (mapa), envia una descripcion de tu locacion, ejemplo: *#lado del tanque elevado, Condominio x Dep. y*\npor delante el simbolo *#*')
                 } else {
-                    client.sendMessage(msg.from, '❌ *Tu carrito esta vacio* ❌ \n *0* .- MENU PRINCIPAL').then((response) => {
-                        if (response.id.fromMe) {
-                            console.log("text fue enviado!");
-                        }
-                    })
+                    client.sendMessage(msg.from, '❌ *Tu carrito esta vacio* ❌ \n *0* .- MENU PRINCIPAL')
                 }
             }else if(msg.type === 'call_log'){
                 client.sendMessage(process.env.CHATBOT, 'Tienes una llamada perdida del #'+msg.from).then((response) => {
@@ -840,96 +672,66 @@ client.on('message', async msg => {
                     }
                 })
             }
-        // } else {`
-        //     var mispoblaciones = await axios(process.env.APP_URL+'api/poblaciones')
-        //     var list = '*En que poblacion te encuentras ?*\n'
-        //     list += '----------------------------------'+'\n'
-        //     for (let index = 0; index < mispoblaciones.data.length; index++) {
-        //         list +=  '*Z'+mispoblaciones.data[index].id+'* .- '+mispoblaciones.data[index].nombre+'\n'
-        //     }
-        //     list += '----------------------------------'
-        //     client.sendMessage(msg.from, list)
-        // }
+        } else {
+            if (localidades.has(msg.body.toUpperCase())) {
+                var clientel = await axios.post(process.env.APP_URL+'api/cliente/update/localidad', {id: micliente.data.id, poblacion_id: localidades.get(msg.body.toUpperCase())})
+                // client.sendMessage(msg.from, 'Localidad Actualizada')
+                console.log(clientel)
+                menu_principal(clientel, msg.from)
+            } else {
+                var mispoblaciones = await axios(process.env.APP_URL+'api/poblaciones')
+                var list = '*En que localidad te encuentras ?*\n'
+                list += '----------------------------------'+'\n'
+                for (let index = 0; index < mispoblaciones.data.length; index++) {
+                    list +=  '*Z'+mispoblaciones.data[index].id+'* .- '+mispoblaciones.data[index].nombre+'\n'
+                    // localidades.set('Z'+mispoblaciones.data[index].id, mispoblaciones.data[index].id)
+                }
+                list += '----------------------------------\n'
+                list += '*Envia un opcion ejemplo: z1 o z2 ..*'
+                client.sendMessage(msg.from, list)
+            }
+        }
     }else{
         // console.log(msg.body.length)
         if (msg.body.length >= 8) {
-            var micliente = await axios.post(process.env.APP_URL+'api/cliente/update', {id: micliente.data.id, nombre: msg.body})
-            var list = '*Hola*, '+micliente.data.nombre+' soy el 🤖CHATBOT🤖 de: *'+process.env.APP_NAME+'* tu asistente de ventas.\n'
-            list += '*COMO TE PUEDO AYUDAR ?* \n'
-            list += '----------------------------------'+' \n'
-            list += '*A* .- TODOS LOS NEGOCIOS \n'
-            list += '*B* .- TODOS LOS PRODUCTOS \n'
-            list += '*C* .- BUSCAR UN PRODUCTO \n'
-            list += '*D* .- VER MI CARRITO \n'
-            list += '*E* .- VER MI PERFIL \n'
-            list += '----------------------------------'+' \n'
-            list += '*ENVIA UNA OPCION DEL MENU ejemplo: a o b ..*'
-            client.sendMessage(msg.from, list).then((response) => {
-                if (response.id.fromMe) {
-                    console.log("text fue enviado!");
-                }
-            })
+            var micliente = await axios.post(process.env.APP_URL+'api/cliente/update/nombre', {id: micliente.data.id, nombre: msg.body})
+            var mispoblaciones = await axios(process.env.APP_URL+'api/poblaciones')
+            var list = '*En que localidad te encuentras ?*\n'
+            list += '----------------------------------'+'\n'
+            for (let index = 0; index < mispoblaciones.data.length; index++) {
+                list +=  '*Z'+mispoblaciones.data[index].id+'* .- '+mispoblaciones.data[index].nombre+'\n'
+                // localidades.set('Z'+mispoblaciones.data[index].id, mispoblaciones.data[index].id)
+            }
+            list += '----------------------------------\n'
+            list += '*Envia un opcion ejemplo: z1 o z2 ..*'
+            client.sendMessage(msg.from, list)
         } else {
-            var list = '*Hola*, soy el 🤖CHATBOT🤖 DEL NEGOCIO : '+process.env.APP_NAME+' \n'
-            list += '*Cual es tu Nombre Completo ?* \n'
+            var list = '*Bienvenido*, soy el 🤖CHATBOT🤖 DE : '+process.env.APP_NAME+' \n'
+            list += '*🙋‍♀️Cual es tu Nombre Completo ?🙋‍♂️* \n'
             list += '*8 caracteres minimo* \n'
-            client.sendMessage(msg.from, list).then((response) => {
-                if (response.id.fromMe) {
-                    console.log("text fue enviado!");
-                }
-            })
+            client.sendMessage(msg.from, list)
         }
     }
-});
-app.get('/', async (req, res) => {
-    res.send('CHATBOT');
-  });
+})
 
-  app.post('/chat', async (req, res) => {
-    console.log(req.query)
-    console.log(req.body)
-    var type = req.body.type ? req.body.type : req.query.phone
-    var message = req.body.message ? req.body.message : req.query.message
-    var phone = req.body.phone ? req.body.phone : req.query.phone
-
-    //res.send(req.body.type)
-    if (type == 'text') {
-        client.sendMessage(phone, message).then((response) => {
-            if (response.id.fromMe) {
-                console.log("text fue enviado!");
-                //res.send('text enviado');
-            }
-        })
-    }else if (type == 'galery') {
-        // const media = MessageMedia.fromFilePath(req.query.attachment);
-        // client.sendMessage(req.query.phone, media, {caption: req.query.message}).then((response) => {
-        //     if (response.id.fromMe) {
-        //         console.log("galery fue enviado!");
-        //     }
-        // });
-    }else if (type == 'pin') {
-        client.sendMessage(phone, message).then((response) => {
-            if (response.id.fromMe) {
-                console.log("pin fue enviado!");
-            }
-        })
-    }
-    res.send('CHAT');
-  });
-
-  const menu_mensajero = async (phone) => {
+const menu_mensajero = async (phone) => {
     var michofer200 = await axios(process.env.APP_URL+'api/mensajero/'+phone)
     if (michofer200.data) {
         var miestado = michofer200.data.estado ? 'Libre' : 'Ocupado'
         var list = '*Hola*, '+michofer200.data.nombre+' soy el 🤖CHATBOT🤖 de: *'+process.env.APP_NAME+'* tu asistente.\n'
+        list += '----------------------------------'+' \n'
+        list += '*ID :* '+michofer200.data.id+'\n'
         list += '*Estado :* '+miestado+'\n'
+        list += '*Nombres :* '+michofer200.data.nombre+'\n'
+        list += '*Localidad :* '+michofer200.data.localidad.nombre+'\n'
         list += '*Whatsapp :* '+michofer200.data.telefono+'\n'
-        list += '*MENU DELIVERY* \n'
+        list += '*Registrado :* '+michofer200.data.published+'\n'
+        list += '*Deliverys :* '+michofer200.data.pedidos.length+'\n'
         list += '----------------------------------'+' \n'
-        list += '*🤟* .- HISTORIAL \n'
-        list += '*🤝* .- Cambiar de Estado\n'
+        list += '*🔃* .- Cambiar de Estado (envia el emoji - Libre/Ocupado)\n'
         list += '----------------------------------'+' \n'
-        list += '*ENVIA UNA OPCION DEL MENU (envia el emoji)*'
+        list += '*Historial de Viajes Realizados*\n'
+        list += process.env.APP_URL+'misviajes'
         client.sendMessage(phone, list).then((response) => {
             if (response.id.fromMe) {
                 console.log("text fue enviado!");
@@ -941,11 +743,13 @@ app.get('/', async (req, res) => {
                 console.log("text fue enviado!");
             }
         })
+        var admin = await client.getContactById(process.env.CHATBOT)
+        client.sendMessage(phone, admin)
     }
     return true;
-  };
+}
 
-  const negocios_pedido = async(id) =>{
+const negocios_pedido = async(id) =>{
     var negocios3= await axios(process.env.APP_URL+'api/pedido/negocios/'+id)
     var send_negocios = []
     var searchrep = []
@@ -965,15 +769,16 @@ app.get('/', async (req, res) => {
         searchrep.push(negocios3.data[index].negocio.id)
     }
     return send_negocios;
-  }
+}
 
-  const menu_principal = async (micliente, phone) => {
-    var list = '*Hola*, '+micliente.data.nombre+' soy el 🤖CHATBOT🤖 de: *'+process.env.APP_NAME+'* tu asistente de ventas.\n'
-    list += '*COMO TE PUEDO AYUDAR ?* \n'
+const menu_principal = async (micliente, phone) => {
+    var list = '*Hola*, '+micliente.data.nombre+' soy el 🤖CHATBOT🤖 de: *'+process.env.APP_NAME+'* tu asistente de ventas, visitas los negocios, llena tu carrito y reliza tu pedido.\n'
+    list += '*OPCIONES* \n'
     list += '----------------------------------'+' \n'
     list += '*A* .- TODOS LOS NEGOCIOS \n'
     list += '*B* .- TODOS LOS PRODUCTOS \n'
     list += '*C* .- BUSCAR UN PRODUCTO \n'
+    list += '----------------------------------'+' \n'
     list += '*D* .- VER MI CARRITO \n'
     list += '*E* .- VER MI PERFIL \n'
     list += '----------------------------------'+' \n'
@@ -981,38 +786,42 @@ app.get('/', async (req, res) => {
     list += '----------------------------------'+' \n'
     list += '*M* .- MI NEGOCIO \n'
     list += '----------------------------------'+' \n'
-    list += '*ENVIA UNA OPCION DEL MENU ejemplo: a o b ..*'
+    list += '*ℹ️* .- SOBRE NOSOTROS \n'
+    list += '----------------------------------'+' \n'
+    list += '*ENVIA UNA OPCION ejemplo: a o b ..*'
     client.sendMessage(phone, list).then((response) => {
         if (response.id.fromMe) {
             console.log("text fue enviado!");
         }
     })
     return true
-  }
-
-  const menu_negocio = async (minegocio, phone) => {
+}
+``
+const menu_negocio = async (minegocio, phone) => {
     // console.log(minegocio.data)
     var miestado = (minegocio.data.estado === '1') ? 'Abierto' : 'Cerrado'
     var list = '*Hola*, '+minegocio.data.contacto+' soy el 🤖CHATBOT🤖 de: *'+process.env.APP_NAME+'* tu asistente de ventas.\n'
+    list += '----------------------------------'+' \n'
     list += '*ID :* '+minegocio.data.id+'\n'
     list += '*Mi Negocio :* '+minegocio.data.nombre+'\n'
+    list += '*Chatbot :* '+minegocio.data.chatbot_id+'\n'
+    list += '*Localidad :* '+minegocio.data.poblacion.nombre+'\n'
     list += '*Direccion :* '+minegocio.data.direccion+'\n'
+    list += '*Registrado :* '+minegocio.data.published+'\n'
+    list += '*Productos :* '+minegocio.data.productos.length+'\n'
+    list += '*Contacto :* '+minegocio.data.contacto+'\n'
     list += '*Estado :* '+miestado+'\n'
-    // list += '*ID :* '+minegocio.data.id+'\n'
     list += '----------------------------------\n'
-    list += '*🔄* .- Cambiar de Estado (Abierto/Cerrrado)\n'
-    // list += '*📍* .- Cambiar de Ubicacion (mapa)\n'
+    list += '*🔄* .- Cambiar de Estado (envia el emoji - Abierto/Cerrado)\n'
     list += '----------------------------------\n'
     list += '*Tienda en Linea*\n'
-    list += process.env.APP_URL+minegocio.data.slug
+    list += process.env.APP_URL+minegocio.data.slug+'\n'
     client.sendMessage(phone, list).then((response) => {
         if (response.id.fromMe) {
             console.log("text fue enviado!");
         }
     })
-    const mimapa = new Location(parseFloat(minegocio.data.latitud), parseFloat(minegocio.data.longitud), minegocio.data.direccion);
-    client.sendMessage(phone, mimapa)
     return true
-  }
+}
 
-  client.initialize();
+client.initialize();

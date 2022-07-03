@@ -17,6 +17,11 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+Route::get('mispedidos/{chatbot_id}', function ($chatbot_id) {
+    $mipedidos = App\Pedido::where('chatbot_id', $chatbot_id)->orderBy('created_at', 'desc')->get();
+    return view('mispedidos', compact('mipedidos'));
+});
+
 
 Route::group(['prefix' => 'admin'], function () {
     Voyager::routes();
