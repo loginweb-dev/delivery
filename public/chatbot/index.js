@@ -4,11 +4,11 @@ const qrcode = require("qrcode-terminal");
 const cors = require('cors')
 const { Client, MessageMedia, LocalAuth, Location, Buttons} = require("whatsapp-web.js");
 
-const { io } = require("socket.io-client");
-const socket = io("https://socket.appxi.net");
+// const { io } = require("socket.io-client");
+// const socket = io("https://socket.appxi.net");
 
 const JSONdb = require('simple-json-db');
-const { json } = require('express');
+// const { json } = require('express');
 const categorias = new JSONdb('json/categorias.json');
 const negocios = new JSONdb('json/negocios.json');
 const productos = new JSONdb('json/productos.json');
@@ -16,6 +16,7 @@ const carts = new JSONdb('json/carts.json');
 const pasarelas = new JSONdb('json/pasarelas.json');
 const locations = new JSONdb('json/locations.json');
 const localidades = new JSONdb('json/localidades.json');
+const bussiness = new JSONdb('json/bussiness.json');
 
 require('dotenv').config({ path: '../../.env' })
 
@@ -37,7 +38,7 @@ const client = new Client({
 
 client.on("qr", (qr) => {
     qrcode.generate(qr, { small: true });
-    console.log('Nuevo QR, recuerde que se genera cada 1/2 minuto.')
+    console.log('Nuevo QR, recuerde que se genera cada 1 minuto.')
 });
 
 client.on('ready', async () => {
@@ -51,15 +52,12 @@ client.on("authenticated", () => {
 
 client.on("auth_failure", msg => {
     console.error('AUTHENTICATION FAILURE', msg);
-
 })
 
 client.on('message', async msg => {
     console.log('MESSAGE RECEIVED', msg);
     console.log(msg.type)
-
     var micliente = await axios(process.env.APP_URL+'api/cliente/'+msg.from)
-    // console.log(micliente.data.nombre)
     if (micliente.data.nombre) {
         if (micliente.data.poblacion_id) {
             if (msg.type === 'chat') {
@@ -76,34 +74,54 @@ client.on('message', async msg => {
                             list += '*A'+miresponse.data[index].id+'* .- '+miresponse.data[index].nombre+' - ('+miresponse.data[index].productos.length+')\n'
                             negocios.set('A'+miresponse.data[index].id, miresponse.data[index].id);
                         }
-                        list += '----------------------------------'+' \n'
-                        list += '*ENVIA UNA OPCION DEL MENU ejemplo: a1 o a2..*'
-                        client.sendMessage(msg.from, list).then((response) => {
-                            if (response.id.fromMe) {
-                                console.log("text fue enviado!");
-                            }
-                        })
+                        list += '----------------------------------\n'
+                        list += '*ENVIA UNA OPCION DEL MENU ejemplo: a1 o a2..*'+'\n'
+                        list += '----------------------------------\n'
+                        list += 'Catalogo Completo\n'
+                        list += process.env.APP_URL+'markplace'
+                        client.sendMessage(msg.from, list)
                         break;
                     case negocios.has(msg.body.toUpperCase()):
                         var miresponse = await axios(process.env.APP_URL+'api/filtros/'+negocios.get(msg.body.toUpperCase()))
-                        var minegocio = miresponse.data[0].negocio
-                        var miestado = (miresponse.data[0].negocio.estado == 1) ? 'Abierto' : 'Cerrado'
-                        var list = '*'+minegocio.nombre.toUpperCase()+'*\n'
-                        list += '----------------------------------'+'\n'
-                        list += '*Estado :* '+miestado+'\n'
-                        list += '*Horario :* '+minegocio.horario+'\n'
-                        list += '*Direccion :* '+minegocio.direccion+'\n'
-                        list += '----------------------------------'+'\n'
-                        list += '*MENU DEL DIA*\n'
-                        for (let index = 0; index < miresponse.data.length; index++) {
-                            list += '*B'+miresponse.data[index].id+'* .- '+miresponse.data[index].nombre+' - *('+miresponse.data[index].precio+' Bs.)*\n'
-                            productos.set('B'+miresponse.data[index].id, miresponse.data[index].id)
-    
+                        //Validación de que solo visualice los de su localidad
+                        if (micliente.data.poblacion_id== miresponse.data[0].negocio.poblacion_id) {
+                            var minegocio = miresponse.data[0].negocio
+                            var miestado = (miresponse.data[0].negocio.estado == 1) ? 'Abierto' : 'Cerrado'
+                            var list = '*'+minegocio.nombre.toUpperCase()+'*\n'
+                            list += '----------------------------------'+'\n'
+                            list += '*Estado :* '+miestado+'\n'
+                            list += '*Horario :* '+minegocio.horario+'\n'
+                            list += '*Direccion :* '+minegocio.direccion+'\n'
+                            list += '----------------------------------'+'\n'
+                            list += '*MENU DEL DIA*\n'
+                            for (let index = 0; index < miresponse.data.length; index++) {
+                                list += '*B'+miresponse.data[index].id+'* .- '+miresponse.data[index].nombre+' - *('+miresponse.data[index].precio+' Bs.)*\n'
+                                productos.set('B'+miresponse.data[index].id, miresponse.data[index].id)
+                            }       
+                            list += '*ENVIA UNA OPCION* ejemplo: B'+miresponse.data[0].id+' o B'+miresponse.data[1].id+'\n'
+                            list += '----------------------------------'+'\n'                                
+                            list += '*Tienda el Linea*\n'
+                            list += process.env.APP_URL+'negocio/'+minegocio.slug+'\n'
+                            list += '----------------------------------'+'\n'   
+                            list += '*Mas Opciones:*\n'
+                            list += '*📞 :* Llamar\n'
+                            list += '*🚩 :* Mapa\n' 
+                            list += '*Envia un emoji*\n'
+                            var mimedia = minegocio.logo ? MessageMedia.fromFilePath('../../storage/app/public/'+minegocio.logo) : MessageMedia.fromFilePath('imgs/mitienda.png');
+                            bussiness.set(msg.from, minegocio.chatbot_id)
+                            client.sendMessage(msg.from, mimedia, {caption: list})
                         }
-                        list += '----------------------------------'+'\n'        
-                        list += '*ENVIA UNA OPCION ejemplo: b1 o b2 ..*'
-                        var mimedia = minegocio.logo ? MessageMedia.fromFilePath('../../storage/app/public/'+minegocio.logo) : MessageMedia.fromFilePath('imgs/mitienda.png');
-                        client.sendMessage(msg.from, mimedia, {caption: list})
+                        else{
+                            client.sendMessage(msg.from, '📍 El negocio solicitado no se encuentra en tu Localidad 📍')
+                        }                       
+                        break;
+                    case (msg.body === '📞'):                        
+                        client.sendMessage(msg.from, await client.getContactById(bussiness.get(msg.from)))
+                        break;
+                    case (msg.body === '🚩'):
+                        var minegocio = await axios(process.env.APP_URL+'api/minegocio/'+bussiness.get(msg.from))
+                        var mimapa = new Location(parseFloat(minegocio.data.latitud), parseFloat(minegocio.data.longitud), minegocio.data.direccion)
+                        client.sendMessage(msg.from, mimapa)
                         break;
                     case (msg.body === 'B') || (msg.body === 'b'):
                         var miresponse = await axios(process.env.APP_URL+'api/productos')
@@ -115,35 +133,43 @@ client.on('message', async msg => {
                         }
                         list += '--------------------------------------------\n'
                         list += '*ENVIA UNA OPCION DEL MENU ejemplo: b1 o b2 ..*'
-                        client.sendMessage(msg.from, list).then((response) => {
-                            if (response.id.fromMe) {
-                                console.log("text fue enviado!");
-                            }
-                        })
+                        client.sendMessage(msg.from, list)
                         break;
                     case productos.has(msg.body.toUpperCase()):
                             var miresponse = await axios(process.env.APP_URL+'api/producto/'+productos.get(msg.body.toUpperCase()))
-                            let media = ''
-                            if (miresponse.data.image) {
-                                media = MessageMedia.fromFilePath('../../storage/app/public/'+miresponse.data.image)
+                            if (miresponse.data) {
+                                if (miresponse.data.negocio.poblacion_id==micliente.data.poblacion_id) {
+                                    let media = ''
+                                    if (miresponse.data.image) {
+                                        media = MessageMedia.fromFilePath('../../storage/app/public/'+miresponse.data.image)
+                                    } else {
+                                        media = MessageMedia.fromFilePath('imgs/default.png')
+                                    }
+                                    var categoria = miresponse.data.categoria ? miresponse.data.categoria.nombre : 'categoria no registrada'
+                                    var list = '*CODIGO* B'+miresponse.data.id+'\n'
+                                    list += '*NOMBRE* .- '+miresponse.data.nombre+'\n'
+                                    list += '*DETALLE* .- '+miresponse.data.detalle+'\n'
+                                    list += '*PRECIO* .- '+miresponse.data.precio+' Bs.\n'
+                                    list += '--------------------------'+'\n'
+                                    list += '*A'+miresponse.data.negocio.id+'* .- '+miresponse.data.negocio.nombre.toUpperCase()+'\n'
+                                    list += '--------------------------'+'\n'
+                                    list += '*Y* .- AÑADIR A CARRITO\n'                                
+                                    list += '*0* .- VOLVER A MENU PRINCIPAL\n'
+                                    list += '--------------------------'+'\n'
+                                    if (miresponse.data.negocio.chatbot_id === msg.from) {
+                                        list += '*🔂* .- Dar de Baja (solo dueño del negocio)\n'
+                                        list += '--------------------------'+'\n'
+                                    }
+                                    list += '*ENVIA UNA OPCION ejemplo: y*'
+                                    client.sendMessage(msg.from, media, {caption: list})
+                                    carts.set(msg.from, miresponse.data.id)
+                                }
+                                else{
+                                    client.sendMessage(msg.from, 'El producto mencionado no se encuentra en su localidad')
+                                }    
                             } else {
-                                media = MessageMedia.fromFilePath('imgs/default.png');
-                            }
-                            var categoria = miresponse.data.categoria ? miresponse.data.categoria.nombre : 'categoria no registrada'
-                            var list = '*CODIGO* B'+miresponse.data.id+'\n'
-                            list += '*NOMBRE* .- '+miresponse.data.nombre+'\n'
-                            list += '*DETALLE* .- '+miresponse.data.detalle+'\n'
-                            list += '*PRECIO* .- '+miresponse.data.precio+' Bs.\n'
-                            list += '--------------------------'+'\n'
-                            list += '*A'+miresponse.data.negocio.id+'* .- '+miresponse.data.negocio.nombre.toUpperCase()+'\n'
-                            list += '--------------------------'+'\n'
-                            list += '*Y* .- AÑADIR A CARRITO\n'
-                            // list += '*B* .- TODOS LOS PRODUCTOS\n'
-                            list += '*0* .- VOLVER A MENU PRINCIPAL\n'
-                            list += '--------------------------'+'\n'
-                            list += '*ENVIA UNA OPCION ejemplo: y*'
-                            client.sendMessage(msg.from, media, {caption: list})
-                            carts.set(msg.from, miresponse.data.id)
+                                client.sendMessage(msg.from, '❌ El producto ahora NO esta disponible ❌')
+                            }           
                             break;
                     case (msg.body === 'C') || (msg.body === 'c'):
                         var list = '*INGRESA UN CRITERIO DE BUSQUEDA* \n'
@@ -209,8 +235,8 @@ client.on('message', async msg => {
                                 total += miresponse.data[index].producto.precio * miresponse.data[index].cantidad
                             }
                             list += '*PRODUCTOS* .- '+total+' Bs. \n'
-                            list += '*DELIVERY* .- '+(micant.data * process.env.COMISION)+' Bs.\n'
-                            list += '*TOTAL* .- '+(total + (micant.data * process.env.COMISION))+' Bs.\n'
+                            list += '*DELIVERY* .- '+(micant.data * parseFloat(micliente.data.localidad.tarifa))+' Bs.\n'
+                            list += '*TOTAL* .- '+(total + (micant.data * parseFloat(micliente.data.localidad.tarifa)))+' Bs.\n'
                             list += '------------------------------------------\n'
                             list += '*G* .- REALIZAR PEDIDO\n'
                             list += '*H* .- VACIAR CARRITO \n'
@@ -226,7 +252,8 @@ client.on('message', async msg => {
                         break;
                     case pasarelas.has(msg.body.toUpperCase()): // FIN DEL FLUJO
                         var miresponse = await axios.post(process.env.APP_URL+'api/chatbot/cart/get', {chatbot_id: msg.from})
-                        if (miresponse.data.length != 0) {
+                        
+                        if (miresponse.data.length != 0 && micliente.data.ubicaciones.length != 0){
                             //registro del pedido--------
                             var midata = {
                                 chatbot_id: msg.from,
@@ -235,39 +262,9 @@ client.on('message', async msg => {
                                 ubicacion_id: locations.get(msg.from)
                             }
                             var newpedido = await axios.post(process.env.APP_URL+'api/pedido/save', midata)
-                            //BANYPAY--------------------------------                                      
-                            var micart = []
-                            for (let index = 0; index < newpedido.data.productos.length; index++) {
-                                micart.push({"concept": newpedido.data.productos[index].producto_name, "quantity": newpedido.data.productos[index].cantidad, "unitPrice": newpedido.data.productos[index].precio})
-                            }
-                            var miconfig = {
-                                    "affiliateCode": process.env.BANIPAY_CODE,
-                                    "notificationUrl": "#",
-                                    "withInvoice": false,
-                                    "externalCode": newpedido.data.id,
-                                    "paymentDescription": "Pago por servicios de Transporte (GoDelivery)",
-                                    "details": micart,
-                                    "postalCode": "Bolivianos"
-                                  }
-                            var banipay = await axios.post('https://banipay.me:8443/api/payments/transaction', miconfig)
-                            await axios.post(process.env.APP_URL+"api/banipay/save", {paymentId: banipay.data.paymentId, transactionGenerated: banipay.data.transactionGenerated, externalCode: banipay.data.externalCode})
-
-                            var mipedido = await axios(process.env.APP_URL+'api/pedido/'+newpedido.data.id)
-
-                            //Responder al cliente por su compra-------------------------
-                            var list = '🕦 *Pedido #'+mipedido.data.id+' Enviado* 🕦 \n Se te notificará el proceso de tu pedido, por este mismo medio. \n 🎉 *GRACIAS POR TU PREFERENCIA* 🎉\n'
-                            list += '------------------------------------------\n'
-                            list += 'Link de Pago *(opcional)*\n'
-                            list += 'https://banipay.me/super/payment'+mipedido.data.banipay.urlTransaction+'\n'
-                            list += '------------------------------------------\n'
-                            list += 'Ingresa al link de pago si deseas pagar por internet *(100% seguro)*, para cualquier consulta o duda. puede llamar al administrador\n'
-                            var mediag = MessageMedia.fromFilePath('imgs/gracias.gif')
-                            client.sendMessage(msg.from, mediag, {caption: list})
-                            // var admin = await client.getContactById(process.env.CHATBOT)
-                            // client.sendMessage(msg.from, admin)
 
                             //Lógica para Agrupar Negocios--------------------------
-                            var negocios3= await axios(process.env.APP_URL+'api/pedido/negocios/'+mipedido.data.id)
+                            var negocios3= await axios(process.env.APP_URL+'api/pedido/negocios/'+newpedido.data.id)
                             var send_negocios = []
                             var searchrep = []
                             for (let index = 0; index < negocios3.data.length; index++) {
@@ -285,7 +282,74 @@ client.on('message', async msg => {
                                 }
                                 searchrep.push(negocios3.data[index].negocio.id)
                             }
-                            
+
+                            var midata2={
+                                pedido_id: newpedido.data.id,
+                                negocios: send_negocios.length,
+                                total_delivery: send_negocios.length * parseFloat(micliente.data.localidad.tarifa)
+                            }
+                            await axios.post(process.env.APP_URL+'api/update/pedido/delivery', midata2)
+
+                            //BANYPAY--------------------------------                                      
+                            // var micart = []
+                            // for (let index = 0; index < newpedido.data.productos.length; index++) {
+                            //     micart.push({"concept": newpedido.data.productos[index].producto_name, "quantity": newpedido.data.productos[index].cantidad, "unitPrice": newpedido.data.productos[index].precio})
+                            // }
+                            // micart.push({"concept": "Servicio de Delivery", "quantity": parseInt(send_negocios.length), "unitPrice": send_negocios.length * parseFloat(micliente.data.localidad.tarifa)})
+
+                            // var miconfig = {
+                            //         "affiliateCode": process.env.BANIPAY_CODE,
+                            //         "notificationUrl": "#",
+                            //         "withInvoice": false,
+                            //         "externalCode": newpedido.data.id,
+                            //         "paymentDescription": "Pago por servicios de Transporte (GoDelivery)",
+                            //         "details": micart,
+                            //         "postalCode": "Bolivianos"
+                            //       }
+                            // var banipay = await axios.post('https://banipay.me:8443/api/payments/transaction', miconfig)
+                            // await axios.post(process.env.APP_URL+"api/banipay/save", {paymentId: banipay.data.paymentId, transactionGenerated: banipay.data.transactionGenerated, externalCode: banipay.data.externalCode})
+
+                            var mipedido = await axios(process.env.APP_URL+'api/pedido/'+newpedido.data.id)
+
+                            var bp_array={
+                                "paymentId": mipedido.data.id,
+                                "gloss": "Pago por Servicio Delivery y Productos",
+                                "amount": (mipedido.data.total + mipedido.data.total_delivery),
+                                "currency": "BOB",
+                                "singleUse": "true",
+                                "expiration": "1/00:05",
+                                "affiliate": "02e4b31f-20bd-43f9-9f2d-3ef7733f2d0f",
+                                "business": "02e4b31f-20bd-43f9-9f2d-3ef7733f2d0f",
+                                "code": "",
+                                "type": "Banipay",
+                                "idCommercial": "BC-0598"
+                            }
+                            var banipay = await axios.post("https://v2.banipay.me/api/pagos/qr-payment", bp_array)
+                            const media = new MessageMedia('image/png', banipay.data.image);
+
+                            var midata2={
+                                externalId:banipay.data.externalId,
+                                identifier: banipay.data.identifier,
+                                image: banipay.data.image,
+                                id_banipay: banipay.data.id
+                            }
+                            await axios.post(process.env.APP_URL+'api/banipay/dos/save', midata2)
+                            //client.sendMessage(msg.from, media, {caption: 'qr_de_pago'}); 
+
+                            //Responder al cliente por su compra-------------------------
+                            var list = '🕦 *Pedido #'+mipedido.data.id+' Enviado* 🕦 \n Se te notificará el proceso de tu pedido, por este mismo medio. \n 🎉 *GRACIAS POR TU PREFERENCIA* 🎉\n'
+                            list += '------------------------------------------\n'
+                            list += 'Instrucciones para Pagar con QR (Opcional): \n'
+                            list += 'Paso 1.- Escanea el QR desde la App de tu Banco \n'
+                            list += 'Paso 2.- Realiza la transacción\n'
+                            list += 'Paso 3.- Envía: *CONFIR'+mipedido.data.id+'* (La palabra seguido del número de pedido indicado) para verificar el estado de la transacción\n'
+                            // list += 'Link de Pago *(opcional)*\n'
+                            // list += 'https://banipay.me/super/payment'+mipedido.data.banipay.urlTransaction+'\n'
+                            // list += '------------------------------------------\n'
+                            // list += 'Ingresa al link de pago si deseas pagar por internet *(100% seguro)*, para cualquier consulta o duda. puede llamar al administrador\n'
+                            //var mediag = MessageMedia.fromFilePath('imgs/gracias.gif')
+                            client.sendMessage(msg.from, media, {caption: list})
+
                             //Lógica para Agrupar y enviar Pedidos por Negocio----------------------
                             for (let index = 0; index < send_negocios.length; index++) {
                                 var total_pedido_actual=0;
@@ -316,10 +380,10 @@ client.on('message', async msg => {
 
                             //ENVIAR PEDIDOS A MENSAJEROS-------------------------
                             ubic_cliente=''
-                            ubic_cliente +='Ubicación del Cliente: '+mipedido.data.cliente.nombre+'\n'
+                            ubic_cliente +='Ubicación del Cliente: '+mipedido.data.cliente.nombre+' - '
                             ubic_cliente +=mipedido.data.ubicacion.detalles
                             const locationcliente = new Location(mipedido.data.ubicacion.latitud, mipedido.data.ubicacion.longitud, ubic_cliente);
-                            var mensajeroslibre = await axios(process.env.APP_URL+'api/mensajeros/libre')
+                            var mensajeroslibre = await axios(process.env.APP_URL+'api/mensajeros/libre/'+micliente.data.poblacion_id)
                             for (let index = 0; index < mensajeroslibre.data.length; index++) {   
                                 var total_mensajero = 0
                                 var cantidad_mensajero = 0 
@@ -341,14 +405,14 @@ client.on('message', async msg => {
                                 mitext += '----- *TOTALES* -----\n'
                                 mitext += '*Productos:* '+cantidad_mensajero+'\n'
                                 mitext += '*Negocios:* '+send_negocios.length+'\n'
-                                mitext += '*Delivery:* '+((send_negocios.length)*process.env.COMISION)+' Bs.\n'
-                                mitext += '*Total:* '+(total_mensajero+((send_negocios.length)*process.env.COMISION))+' Bs.'
+                                mitext += '*Delivery:* '+((send_negocios.length)*parseFloat(micliente.data.localidad.tarifa))+' Bs.\n'
+                                mitext += '*Total:* '+(total_mensajero+((send_negocios.length)*parseFloat(micliente.data.localidad.tarifa)))+' Bs.'
                                 client.sendMessage(mensajeroslibre.data[index].telefono, mitext)
                                 
                                 //enviando pedido a negocios------------------------------
                                 for (let j = 0; j < send_negocios.length; j++) {
                                     var mitexto=''
-                                    mitexto +='Ubicación del Negocio: '+send_negocios[j].nombre+'\n'
+                                    mitexto +='Ubicación del Negocio: '+send_negocios[j].nombre+' - '
                                     mitexto +=send_negocios[j].direccion
                                     client.sendMessage(mensajeroslibre.data[index].telefono, new Location(parseFloat(send_negocios[j].latitud), parseFloat(send_negocios[j].longitud), mitexto))
                                 }
@@ -358,30 +422,21 @@ client.on('message', async msg => {
                                 mitext += 'Envia *='+mipedido.data.id+'* para confirmar.'
                                 client.sendMessage(mensajeroslibre.data[index].telefono, mitext)
                             }
-                            var admin = await client.getContactById(process.env.CHATBOT)
-                            client.sendMessage(msg.from, admin)
+                            // var admin = await client.getContactById(process.env.CHATBOT)
+                            // client.sendMessage(msg.from, admin)
                             }else {
-                                client.sendMessage(msg.from, '❌ *Tu carrito esta vacio* ❌ \n *0* .- MENU PRINCIPAL')
+                                client.sendMessage(msg.from, '❌ *Tu carrito esta vacio o no tienes un mapa registrado* ❌ \n *0* .- MENU PRINCIPAL')
                             }
                         break;
                     case (msg.body === 'G') || (msg.body === 'g'):
                         var micart = await axios.post(process.env.APP_URL+'api/chatbot/cart/get', {chatbot_id: msg.from})
                         if (micart.data.length != 0)
                         {
-                            // var mimedia = MessageMedia.fromFilePath('../../storage/app/public/location.jpg')
                             var list = '🗺️ Genial, ahora necesitamos tu ubicacion, para enviar tu pedido 🗺️\nEnvia tu ubicacion actual (un mapa) por favor\n'
                             list += 'Si ya enviaste un mapa anteriormente, puedes enviar *(p1 o p2)*'
-                            client.sendMessage(msg.from, list).then((response) => {
-                                if (response.id.fromMe) {
-                                    console.log("text fue enviado!");
-                                }
-                            })
+                            client.sendMessage(msg.from, list)
                         } else {
-                            client.sendMessage(msg.from, '❌ *Tu carrito esta vacio* ❌ \n *0* .- MENU PRINCIPAL').then((response) => {
-                                if (response.id.fromMe) {
-                                    console.log("text fue enviado!");
-                                }
-                            })
+                            client.sendMessage(msg.from, '❌ *Tu carrito esta vacio* ❌ \n *0* .- MENU PRINCIPAL')
                         }
                         break;
                     case (msg.body === 'H') || (msg.body === 'h'):
@@ -417,32 +472,21 @@ client.on('message', async msg => {
                                 negocio_name: product.data.negocio.nombre
                             }
                             await axios.post(process.env.APP_URL+'api/chatbot/cart/add', midata)
-                            var list = '🎉 Producto agregado a tu carrito 🎉\n'
+                            var list = '*🎉 Producto agregado a tu carrito 🎉*\n'
+                            list += 'Si deseas agregar mas productos a tu carrito visita el mismo u otros negocios (A).\n'
                             list += '------------------------------------------\n'
                             list += '*D* .- VER MI CARRITO\n'
                             list += '*G* .- SOLICITAR PEDIDO\n'
-                            // list += '*0* .- MENU PRINCIPAL\n'
+                            list += '*A* .- TODOS LOS NEGOCIOS\n'
                             list += '------------------------------------------\n'
                             list += '*ENVIA UNA OPCION ejemplo: d o g ..*'
                             client.sendMessage(msg.from, list)
                         } else {
-                            client.sendMessage(msg.from, '❌Lo lamento el negocio esta cerrado❌')
+                            client.sendMessage(msg.from, '❌ Lo lamento el negocio esta cerrado ❌')
                         }
                         break;
                     case (msg.body === 'E') || (msg.body === 'e') || (msg.body === 'Perfil') || (msg.body === 'perfil') || (msg.body === 'miperfil') || (msg.body === 'Miperfil') || (msg.body === 'Mi Perfil') || (msg.body === 'mi perfil'):
-                        var miperfil = await axios(process.env.APP_URL+'api/cliente/'+msg.from)
-                        var list = '🧑‍💻 *MI PERFIL* 🧑‍💻\n'
-                        list += '------------------------------------------\n'
-                        list += 'ID : '+miperfil.data.id+'\n'
-                        list += 'Nombres : '+miperfil.data.nombre+'\n'
-                        list += 'Localidad : '+miperfil.data.localidad.nombre+'\n'
-                        list += 'Chatbot : '+miperfil.data.chatbot_id+'\n'
-                        list += 'Registrado : '+miperfil.data.published+'\n'
-                        list += 'Pedidos : '+miperfil.data.pedidos.length+'\n'
-                        list += 'Mapas : '+miperfil.data.ubicaciones.length+'\n'
-                        list += '------------------------------------------\n'
-                        list += process.env.APP_URL+'mispedidos/'+msg.from
-                        client.sendMessage(msg.from, list)
+                        menu_cliente(msg.from)
                         break;
                     case (msg.body.substring(0, 1) === '#'):
                         var midescription = msg.body.substring(1, 99)
@@ -497,17 +541,12 @@ client.on('message', async msg => {
                             for (let index = 0; index < send_negocios.length; index++) {
                                 mitext= ''
                                 mitext+= 'El Delivery: '+pedido.data.mensajero.nombre+' será el encargado de recoger el pedido #'+midescription+'\n'
-                                var telefono_negocio= '591'+send_negocios.data[index].telefono+'@c.us'
+                                var telefono_negocio= '591'+send_negocios[index].telefono+'@c.us'
                                 client.sendMessage(telefono_negocio, mitext)                           
                             }
                         } else {
-                            client.sendMessage(msg.from, 'El pedido #'+midescription+' ya está asignado a otro Delivery, intenta con otro pedido.').then((response) => {
-                                if (response.id.fromMe) {
-                                    console.log("text fue enviado!");
-                                }
-                            })
+                            client.sendMessage(msg.from, 'El pedido #'+midescription+' ya está asignado a otro Delivery, intenta con otro pedido.')
                         }
-    
                         break;    
                     //Estado del Pedido Cancelado
                     case (msg.body.substring(0, 1) === '?'):
@@ -518,45 +557,27 @@ client.on('message', async msg => {
                         var pedido_cancelado= await axios.post(process.env.APP_URL+'api/cancelar/pedido', midata)
                         if (pedido_cancelado) {
                             $chofer= await axios(process.env.APP_URL+'api/search/mensajero/'+pedido_cancelado.data.mensajero_id)
-                            client.sendMessage(msg.from, 'Pedido #'+pedido_cancelado.data.id+' cancelado esperamos que resuelva lo mas pronto posible sus inconvenientes.').then((response) => {
-                                if (response.id.fromMe) {
-                                    console.log("text fue enviado!");
-                                }
-                            })
-    
+                            client.sendMessage(msg.from, 'Pedido #'+pedido_cancelado.data.id+' cancelado esperamos que resuelva lo mas pronto posible sus inconvenientes.')
                             //Mensaje al Cliente de que su pedido fue cancelado
                             var mitext=''
                             mitext+= 'Su pedido #'+pedido_cancelado.data.id+' ha sido cancelado por el chofer '+pedido_cancelado.data.mensajero.nombre+'\n'
                             mitext+= 'El motivo fue el siguiente: '+midescription+'\n'
                             mitext+= 'Estamos buscando otro chofer para llevar su pedido, lamentamos los inconvenientes.'
-                            client.sendMessage(pedido_cancelado.data.cliente.chatbot_id, mitext).then((response) => {
-                                if (response.id.fromMe) {
-                                    console.log("text fue enviado!");
-                                }
-                            })
+                            client.sendMessage(pedido_cancelado.data.cliente.chatbot_id, mitext)
                             //Envío a los mensajeros que el pedido está libre nuevamente
                             var mensajeroslibre = await axios(process.env.APP_URL+'api/mensajeros/libre')
                             for (let index = 0; index < mensajeroslibre.data.length; index++) {
                                 console.log(mensajeroslibre.data[index].telefono)
                                 if(mensajeroslibre.data[index].telefono != msg.from){    
-                                var mitext = '' 
-                                mitext += 'Hola, '+mensajeroslibre.data[index].nombre+' el pedido #'+pedido_cancelado.data.id+' está disponible nuevamente,\n'
-                                mitext += 'si aun deseas tomar el pedido para llevarlo a su destino envía: *='+pedido_cancelado.data.id+'*\n'
-                                client.sendMessage(mensajeroslibre.data[index].telefono, mitext).then((response) => {
-                                    if (response.id.fromMe) {
-                                        console.log("text fue enviado!");
-                                    }
-                                })
+                                    var mitext = '' 
+                                    mitext += 'Hola, '+mensajeroslibre.data[index].nombre+' el pedido #'+pedido_cancelado.data.id+' está disponible nuevamente,\n'
+                                    mitext += 'si aun deseas tomar el pedido para llevarlo a su destino envía: *='+pedido_cancelado.data.id+'*\n'
+                                    client.sendMessage(mensajeroslibre.data[index].telefono, mitext)
                                 }
-                            }
-                            
+                            }                            
                         }
                         else{
-                            client.sendMessage(msg.from, 'Usted no tiene un pedido asignado para cancelarlo').then((response) => {
-                                if (response.id.fromMe) {
-                                    console.log("text fue enviado!");
-                                }
-                            })
+                            client.sendMessage(msg.from, 'Usted no tiene un pedido asignado para cancelarlo')
                         }
                         break;
                     //Estado del Pedido Llevando
@@ -571,11 +592,7 @@ client.on('message', async msg => {
                         mitext += 'Su pedido *#'+pedido.data.id+'* ya fue entregado a su Delivery asignado y está siendo llevado a su Domicilio.\n'
                         mitext += 'Porfavor, esté atento.\n'
                         mitext += 'Una vez le llegue el pedido envíe *%'+pedido.data.id+'* para confirmar porfavor.'
-                        client.sendMessage(pedido.data.chatbot_id, mitext).then((response) => {
-                            if (response.id.fromMe) {
-                                console.log("text fue enviado!");
-                            }
-                        })
+                        client.sendMessage(pedido.data.chatbot_id, mitext)
                         break;
                     //Estado del Pedido Entregado
                     case (msg.body.substring(0, 1) === '%'):
@@ -623,9 +640,6 @@ client.on('message', async msg => {
                             menu_principal(micliente, msg.from)
                         }
                         break;
-                    case (msg.body === 'test'):
-                        await axios.post(process.env.APP_URL+"api/banipay/save", {paymentId: '520860', transactionGenerated: 'a904adfe26d74ab7a989568e94522888', externalCode: 17})
-                        break;
                     case (msg.body === 'f') || (msg.body === 'F'):
                         menu_mensajero(msg.from)
                         break;
@@ -635,15 +649,86 @@ client.on('message', async msg => {
                         menu_mensajero(msg.from)
                         break;
                     case (msg.body === 'ℹ️'):
-                        // var minegocio = await axios(process.env.APP_URL+'api/negocio/update/'+msg.from)
-                        client.sendMessage(msg.from, 'Somos un servicio de mensajaeria(delivery) todo por whatsapp, donde podras realizar tus compras a los negocios de tu preferiencia, para mas informacion visita nuestra pagina web.')
-                        client.sendMessage(msg.from, process.env.APP_URL+'nosotros')
-                        menu_negocio(minegocio, msg.from)
+                        // var minegocio = await axios(process.env.APP_URL+'api/minegocio/'+msg.from)
+                        client.sendMessage(msg.from, '🚚 Somos un servicio de mensajaeria(delivery) todo por whatsapp y con un asistente virtual 🤖CHATBOT🤖, donde podras realizar tus compras a los 🍴 negocios🍴 de tu preferiencia, para mas informacion visita nuestra pagina web. 🚚\n'+process.env.APP_URL+'nosotros')
+                        // menu_negocio(minegocio, msg.from)
                         break;
                     case (msg.body === '🔄'):
                         var minegocio = await axios(process.env.APP_URL+'api/negocio/update/'+msg.from)
                         client.sendMessage(msg.from, 'Estado Cambiado')
                         menu_negocio(minegocio, msg.from)
+                        break;
+                    case (msg.body === '📍'):
+                        var mispoblaciones = await axios(process.env.APP_URL+'api/poblaciones')
+                        var list = '*A que localidad te cambiar ?*\n'
+                        list += '----------------------------------'+'\n'
+                        for (let index = 0; index < mispoblaciones.data.length; index++) {
+                            list +=  '*Z'+mispoblaciones.data[index].id+'* .- '+mispoblaciones.data[index].nombre+'\n'
+                        }
+                        list += '----------------------------------\n'
+                        list += '*Envia un opcion ejemplo: z1 o z2 ..*'
+                        client.sendMessage(msg.from, list)
+                        await axios.post(process.env.APP_URL+'api/chatbot/cart/clean', {chatbot_id: msg.from})
+                        break;
+                    case (msg.body === '🔂'):
+                            await axios.post(process.env.APP_URL+'api/producto/update/admin', {phone: msg.from, producto_id: carts.get(msg.from)})
+                            client.sendMessage(msg.from, '🛒 Producto Actualizado !')
+                            break;
+                    case (localidades.has(msg.body.toUpperCase())):
+                        await axios.post(process.env.APP_URL+'api/cliente/update/localidad', {id: micliente.data.id, poblacion_id: localidades.get(msg.body.toUpperCase())})
+                        client.sendMessage(msg.from, 'Estado Cambiado')
+                        menu_cliente(msg.from)
+                        break;
+                    case (msg.body.substring(0, 6) === 'Confir') || (msg.body.substring(0, 6) === 'confir') || (msg.body.substring(0, 6) === 'CONFIR'):
+                        var midescription = msg.body.substring(6, 99)
+                        //console.log(msg.body.length)
+                        var mipedido = await axios(process.env.APP_URL+'api/pedido/'+midescription)
+                        var transaccion= await axios("https://modal-flask-dev-q5zse.ondigitalocean.app/consultQR?id="+mipedido.data.banipaydos.externalId)
+                        if (transaccion.data.status=="EN COLA") {
+                            //client.sendMessage(msg.from, 'Transacción de la Venta #'+midescription+' aún *NO Realizada*')
+                            client.sendMessage(msg.from, 'Transacción de la Venta #'+midescription+' realizada exitosamente')
+                            var send_negocios= await negocios_pedido(midescription)
+                            //console.log(send_negocios)
+                            for (let index = 0; index < send_negocios.length; index++) {
+                                mitext= ''
+                                mitext+= 'El Pedido #'+midescription+' del Cliente '+mipedido.data.cliente.nombre+'  fue pagado exitosamente por transferencia \n'
+                                var telefono_negocio= '591'+send_negocios[index].telefono+'@c.us'
+                                client.sendMessage(telefono_negocio, mitext)                           
+                            }
+                            client.sendMessage(mipedido.data.mensajero.telefono, 'El Pedido #'+midescription+' del Cliente '+mipedido.data.cliente.nombre+'  fue pagado exitosamente por transferencia')
+
+                        } else {
+                            //client.sendMessage(msg.from, 'Transacción de la Venta #'+midescription+' realizada exitosamente')
+                            client.sendMessage(msg.from, 'Transacción de la Venta #'+midescription+' aún *NO Realizada*')
+
+                        }
+                        break;
+                    case (msg.body === 'test'):
+                        var bp_array={
+                            "paymentId": 3,
+                            "gloss": "Mi pago",
+                            "amount": 10.00,
+                            "currency": "BOB",
+                            "singleUse": "true",
+                            "expiration": "1/00:05",
+                            "affiliate": "02e4b31f-20bd-43f9-9f2d-3ef7733f2d0f",
+                            "business": "02e4b31f-20bd-43f9-9f2d-3ef7733f2d0f",
+                            "code": "abc-012",
+                            "type": "Banipay",
+                            "idCommercial": "BC-0001"
+                        }
+                        var banipay = await axios.post("https://v2.banipay.me/api/pagos/qr-payment", bp_array)
+                        console.log(banipay.data)
+                        
+                            //const media = await banipay.data.image.downloadMedia();
+                            // do something with the media data here
+                            const media = new MessageMedia('image/png', banipay.data.image);
+                            client.sendMessage(msg.from, media, {caption: 'qr_de_pago'});                        
+                            // client.sendMessage(msg.from, list).then((response) => {
+                        //     if (response.id.fromMe) {
+                        //         console.log("text fue enviado!");
+                        //     }
+                        // })
                         break;
                     default:
                     break;
@@ -675,8 +760,6 @@ client.on('message', async msg => {
         } else {
             if (localidades.has(msg.body.toUpperCase())) {
                 var clientel = await axios.post(process.env.APP_URL+'api/cliente/update/localidad', {id: micliente.data.id, poblacion_id: localidades.get(msg.body.toUpperCase())})
-                // client.sendMessage(msg.from, 'Localidad Actualizada')
-                console.log(clientel)
                 menu_principal(clientel, msg.from)
             } else {
                 var mispoblaciones = await axios(process.env.APP_URL+'api/poblaciones')
@@ -706,13 +789,30 @@ client.on('message', async msg => {
             list += '*Envia un opcion ejemplo: z1 o z2 ..*'
             client.sendMessage(msg.from, list)
         } else {
-            var list = '*Bienvenido*, soy el 🤖CHATBOT🤖 DE : '+process.env.APP_NAME+' \n'
+            var list = '*Bienvenido*, soy el 🤖CHATBOT🤖 DE : '+process.env.APP_NAME+'\n'
             list += '*🙋‍♀️Cual es tu Nombre Completo ?🙋‍♂️* \n'
             list += '*8 caracteres minimo* \n'
             client.sendMessage(msg.from, list)
         }
     }
 })
+
+
+app.get('/', async (req, res) => {
+    res.send('CHATBOT');
+});
+app.get('/chat/negocios', async (req, res) => {
+    var misnegocios = await axios(process.env.APP_URL+'api/all/negocios')
+    var list = 'Hola, soy el 🤖CHATBOT🤖 de '+process.env.APP_NAME+'\n'
+    list += '----------------------------------\n'
+    list += 'Te ofrecemos nustro servicio de Mensajeria (delivery)\n'
+    list += '----------------------------------\n'
+    list += 'Tambien te ayudamos con la promocion y marketing de tu negocio en la redes sociales, mas informacion con el administrador.\n'
+    for (let index = 0; index < misnegocios.data.length; index++) {
+        client.sendMessage(misnegocios.data[index].chatbot_id, list)
+    }
+    res.send('chat enviado');
+});
 
 const menu_mensajero = async (phone) => {
     var michofer200 = await axios(process.env.APP_URL+'api/mensajero/'+phone)
@@ -731,18 +831,10 @@ const menu_mensajero = async (phone) => {
         list += '*🔃* .- Cambiar de Estado (envia el emoji - Libre/Ocupado)\n'
         list += '----------------------------------'+' \n'
         list += '*Historial de Viajes Realizados*\n'
-        list += process.env.APP_URL+'misviajes'
-        client.sendMessage(phone, list).then((response) => {
-            if (response.id.fromMe) {
-                console.log("text fue enviado!");
-            }
-        })
+        list += process.env.APP_URL+'mensajero/'+phone
+        client.sendMessage(phone, list)
     } else {
-        client.sendMessage(phone, 'No se encuentra registrado como chofer, consulte con el administrador').then((response) => {
-            if (response.id.fromMe) {
-                console.log("text fue enviado!");
-            }
-        })
+        client.sendMessage(phone, 'No se encuentra registrado como chofer, consulte con el administrador')
         var admin = await client.getContactById(process.env.CHATBOT)
         client.sendMessage(phone, admin)
     }
@@ -787,18 +879,15 @@ const menu_principal = async (micliente, phone) => {
     list += '*M* .- MI NEGOCIO \n'
     list += '----------------------------------'+' \n'
     list += '*ℹ️* .- SOBRE NOSOTROS \n'
+    list += process.env.APP_URL+'/youtube\n'
+    list += process.env.APP_URL+'ayuda \n'
     list += '----------------------------------'+' \n'
     list += '*ENVIA UNA OPCION ejemplo: a o b ..*'
-    client.sendMessage(phone, list).then((response) => {
-        if (response.id.fromMe) {
-            console.log("text fue enviado!");
-        }
-    })
+    client.sendMessage(phone, list)
     return true
 }
-``
+
 const menu_negocio = async (minegocio, phone) => {
-    // console.log(minegocio.data)
     var miestado = (minegocio.data.estado === '1') ? 'Abierto' : 'Cerrado'
     var list = '*Hola*, '+minegocio.data.contacto+' soy el 🤖CHATBOT🤖 de: *'+process.env.APP_NAME+'* tu asistente de ventas.\n'
     list += '----------------------------------'+' \n'
@@ -814,14 +903,26 @@ const menu_negocio = async (minegocio, phone) => {
     list += '----------------------------------\n'
     list += '*🔄* .- Cambiar de Estado (envia el emoji - Abierto/Cerrado)\n'
     list += '----------------------------------\n'
-    list += '*Tienda en Linea*\n'
-    list += process.env.APP_URL+minegocio.data.slug+'\n'
-    client.sendMessage(phone, list).then((response) => {
-        if (response.id.fromMe) {
-            console.log("text fue enviado!");
-        }
-    })
+    list += '*Mi Tienda en Linea*\n'
+    list += process.env.APP_URL+'negocio/'+minegocio.data.slug
+    client.sendMessage(phone, list)
     return true
 }
 
+const menu_cliente = async (phone) => {
+    var miperfil = await axios(process.env.APP_URL+'api/cliente/'+phone)
+    var list = '🧑‍💻 *MI PERFIL* 🧑‍💻\n'
+    list += '------------------------------------------\n'
+    list += '*ID :* '+miperfil.data.id+'\n'
+    list += '*Nombres :* '+miperfil.data.nombre+'\n'
+    list += '*Localidad :* '+miperfil.data.localidad.nombre+'\n'
+    // list += '*Chatbot :* '+miperfil.data.chatbot_id+'\n'
+    list += '*Registrado :* '+miperfil.data.published+'\n'
+    list += '*Pedidos :* '+miperfil.data.pedidos.length+'\n'
+    list += '*Mapas :* '+miperfil.data.ubicaciones.length+'\n'
+    list += '------------------------------------------\n'
+    list += '*📍 :* Cambiar de Localidad (envia el emoji)\n'
+    list += process.env.APP_URL+'cliente/'+phone
+    client.sendMessage(phone, list)
+}
 client.initialize();

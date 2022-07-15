@@ -14,6 +14,8 @@ use App\Mensajero;
 use App\Comentario;
 use App\Poblacione;
 use App\Banipay;
+use App\Banipaydo;
+
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -48,7 +50,19 @@ Route::get('productos', function(){
 });
 
 Route::get('producto/{id}', function($id){
-    return Producto::where('id',$id)->with('categoria', 'negocio')->first();
+    return Producto::where('id', $id)->where('ecommerce', 1)->with('categoria', 'negocio')->first();
+});
+
+
+Route::post('producto/update/admin', function(Request $request){
+    $producto = Producto::where('id', $request->producto_id)->with('categoria', 'negocio')->first();
+    // return $producto;
+    if ($producto->negocio->chatbot_id === $request->phone) {
+        $producto->ecommerce = $producto->ecommerce ? 0 : 1;
+        $producto->save();
+        return $producto;
+    }
+    return $producto;
 });
 
 // SEARCH PRODUCTO
@@ -126,7 +140,7 @@ Route::post('pedido/save', function (Request $request) {
         'chatbot_id' => $request->chatbot_id,
         'ubicacion_id' => $request->ubicacion_id,
         'descuento' => 0,
-        'total'=>0
+        'total'=>0,
     ]);
     $mitotal = 0;
     foreach ($carts as $item) {
@@ -154,7 +168,7 @@ Route::post('chatbot/cart/clean', function (Request $request) {
     return Carrito::where('chatbot_id', $request->chatbot_id)->delete();
 });
 Route::get('filtros/{negocio_id}', function ($negocio_id) {
-    $result = Producto::where('negocio_id', $negocio_id )->orderBy('nombre', 'asc')->with('categoria','negocio')->get();
+    $result = Producto::where('negocio_id', $negocio_id )->where('ecommerce', 1)->with('categoria','negocio')->get();
     return $result;
 });
 
@@ -187,7 +201,7 @@ Route::post('cliente/update/localidad', function (Request $request) {
 });
 
 
-//ubicacion/save
+//ubicacion ---------
 Route::post('ubicacion/save', function (Request $request) {
     $ubicacion = Ubicacione::create([
         'latitud' => $request->latitud, //falta
@@ -196,6 +210,7 @@ Route::post('ubicacion/save', function (Request $request) {
     ]);
     return $ubicacion;
 });
+
 Route::post('ubicacion/update', function (Request $request) {
     $ubicacion = Ubicacione::find($request->id);
     $ubicacion->detalles = $request->detalle;
@@ -203,15 +218,23 @@ Route::post('ubicacion/update', function (Request $request) {
     return $ubicacion;
 });
 
+Route::post('ubicacion/update', function (Request $request) {
+    $ubicacion = Ubicacione::find($request->id);
+    $ubicacion->detalles = $request->detalle;
+    $ubicacion->save();
+    return $ubicacion;
+});
+
+
 //pedidos
 Route::get('pedidos/{phone}', function ($phone) {
     return Pedido::where('chatbot_id', $phone)->orderBy('created_at', 'desc')->with('estado', 'mensajero', 'productos')->get();
 
 });
 
-//Mensajeros libres
-Route::get('mensajeros/libre', function(){
-    return Mensajero::where('estado', 1)->get();
+//Mensajeros libres de la Poblacion
+Route::get('mensajeros/libre/{poblacion_id}', function($poblacion_id){
+    return Mensajero::where('estado', 1)->where('poblacion_id', $poblacion_id)->get();
 });
 
 //Negocios del Pedido
@@ -221,7 +244,7 @@ Route::get('negocios/pedido/{midata}', function($midata){
 
 //Buscar Pedido con Cliente
  Route::get('pedido/{id}', function($id){
-    return Pedido::where('id', $id)->with('cliente', 'productos', 'ubicacion', 'mensajero', 'banipay')->first();
+    return Pedido::where('id', $id)->with('cliente', 'productos', 'ubicacion', 'mensajero', 'banipay', 'banipaydos')->first();
  });
 
  //Asignar Pedido a Mensajero
@@ -323,8 +346,9 @@ Route::post('pedido/comentario', function(Request $request){
 Route::get('poblaciones', function(){
     return Poblacione::orderBy('created_at', 'desc')->get();
 });
-
-
+Route::get('poblacion/{id}', function ($id) {
+    return Poblacione::find($id);
+});
 
 //APIS PARA BACKEND
 
@@ -361,4 +385,25 @@ Route::post('banipay/save', function(Request $request) {
         'urlTransaction' => '?t='.$request->transactionGenerated.'&p='.$request->paymentId
     ]);
     return $banipay;
+});
+
+//banipay v.2
+Route::post('banipay/dos/save', function(Request $request) {
+    $banipay = Banipaydo::create([
+        'pedido_id' => $request->identifier,
+        'externalId'=> $request->externalId,
+        'identifier'=>$request->identifier,
+        'image'=>$request->image,
+        'id_banipay' =>$request->id_banipay,
+    ]);
+    return $banipay;
+});
+
+//Actualizar Venta con Total Delivery y Negocios
+Route::post('update/pedido/delivery', function(Request $request){
+    $pedido= Pedido::find($request->pedido_id);
+    $pedido->negocios=$request->negocios;
+    $pedido->total_delivery=$request->total_delivery;
+    $pedido->save();
+    return true;
 });

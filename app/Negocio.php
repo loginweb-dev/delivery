@@ -24,12 +24,16 @@ class Negocio extends Model
       return date('Y-m-d', strtotime($this->attributes['created_at']));
     }
     
-	public function productos()
+	  public function productos()
     {
         return $this->hasMany(Producto::class);
     }
     public function poblacion()
     {
         return $this->belongsTo(Poblacione::class, 'poblacion_id');
+    }
+    public function tipo()
+    {
+        return $this->belongsTo(Tipo::class, 'tipo_id');
     }
 }

@@ -16,7 +16,9 @@ class Pedido extends Model
         'descuento',
         'total',
         'ubicacion_id',
-        'estado_id'
+        'estado_id',
+        'total_delivery',
+        'negocios'
     ];
 
 	protected $appends=['published', 'fecha'];
@@ -57,5 +59,9 @@ class Pedido extends Model
     public function banipay()
     {
         return $this->hasOne(Banipay::class);
+    }
+    public function banipaydos()
+    {
+        return $this->hasOne(Banipaydo::class);
     }
 }
