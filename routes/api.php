@@ -2,6 +2,7 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Estado;
 use App\Negocio;
 use App\Producto;
 use App\Carrito;
@@ -15,7 +16,15 @@ use App\Comentario;
 use App\Poblacione;
 use App\Banipay;
 use App\Banipaydo;
-
+use App\Categoria;
+use App\Tipo;
+use App\Extraproducto;
+use App\Extracarrito;
+use App\Extrapedido;
+use TCG\Voyager\Models\User;
+use TCG\Voyager\Traits\Resizable;
+use App\Precio;
+use App\RelProductoPrecio;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -42,7 +51,17 @@ Route::get('minegocio/{phone}', function($phone){
     return Negocio::where('chatbot_id', $phone)->with('productos', 'poblacion')->first();
 });
 
+Route::post('negocio/modo/update', function (Request $request) {
+    $cliente = Cliente::where('chatbot_id', $request->phone)->first();
+    $cliente->modo = $request->modo;
+    $cliente->save();
+    $newcliente = Cliente::find($cliente->id);
+    return $newcliente;
+});
 
+Route::get('bussiness', function(){
+    return Negocio::all();
+});
 
 Route::get('productos', function(){
     return Producto::with('categoria', 'negocio')->get();
@@ -50,9 +69,12 @@ Route::get('productos', function(){
 });
 
 Route::get('producto/{id}', function($id){
-    return Producto::where('id', $id)->where('ecommerce', 1)->with('categoria', 'negocio')->first();
+    return Producto::where('id', $id)->where('ecommerce', 1)->with('categoria', 'negocio', 'precios')->first();
 });
 
+Route::get('precio/{id}', function($id){
+    return Precio::find($id);
+});
 
 Route::post('producto/update/admin', function(Request $request){
     $producto = Producto::where('id', $request->producto_id)->with('categoria', 'negocio')->first();
@@ -72,31 +94,38 @@ Route::post('chatbot/search', function (Request $request) {
 });
 
 Route::post('chatbot/cart/get', function (Request $request) {
-    return Carrito::where('chatbot_id', $request->chatbot_id)->with('producto')->get();
+    return Carrito::where('chatbot_id', $request->chatbot_id)->with('producto', 'extras')->get();
+});
+
+Route::get('cart/producto/get/{chatbot_id}', function ($chatbot_id) {
+    return Carrito::orderBy('created_at', 'desc')->where('chatbot_id', $chatbot_id)->first();
 });
 
 //cart
 Route::post('chatbot/cart/add', function (Request $request) {
     $item = Carrito::where('producto_id', $request->product_id)->where('chatbot_id', $request->chatbot_id)->first();
-    // $cant = 0;
-    if ($item) {
-        $item->cantidad = $request->cantidad;
-        $item->save();
-        return  Carrito::where('producto_id', $request->product_id)->where('chatbot_id', $request->chatbot_id)->first();
-    } else {
-        // $cant = 1;
-        $cart = Carrito::create([
-            'producto_id' => $request->product_id,
-            'producto_name' => $request->product_name,
-            'chatbot_id' => $request->chatbot_id,
-            'precio' => $request->precio,
-            'cantidad' => $request->cantidad,
-            'negocio_id' => $request->negocio_id,
-            'negocio_name' =>$request->negocio_name
-        ]);
-        return $cart;
-    }
+    $cart = Carrito::create([
+        'producto_id' => $request->product_id,
+        'producto_name' => $request->product_name,
+        'chatbot_id' => $request->chatbot_id,
+        'precio' => $request->precio,
+        'cantidad' => $request->cantidad,
+        'negocio_id' => $request->negocio_id,
+        'negocio_name' =>$request->negocio_name
+    ]);
+    return $cart;
+});
 
+//add extras carrito
+Route::post('carrito/add/extras', function(Request $request){
+    $extras= Extracarrito::create([
+        'extra_id'=>$request->extra_id,
+        'precio'=>$request->precio,
+        'cantidad'=>$request->cantidad,
+        'total'=>$request->total,
+        'carrito_id'=>$request->carrito_id,
+        'producto_id'=>$request->producto_id,
+    ]);
 });
 
 Route::get('carrito/negocios/{chatbot_id}', function($chatbot_id){
@@ -104,7 +133,7 @@ Route::get('carrito/negocios/{chatbot_id}', function($chatbot_id){
 });
 
 Route::get('pedido/negocios/{id}', function($id){
-    return PedidoDetalle::where('pedido_id', $id)->with('negocio')->get();
+    return PedidoDetalle::where('pedido_id', $id)->with('negocio', 'extras')->get();
 });
 
 Route::get('pedido/carrito/negocios/{chatbot_id}', function($chatbot_id){
@@ -129,9 +158,12 @@ Route::get('chatbot/pasarelas/get',function(){
 
 });
 
+Route::get('carrito/{chatbot}', function ($chatbot) {
+   return Carrito::where('chatbot_id', $chatbot)->with('producto', 'extras')->get();
+});
 // VENTAS
 Route::post('pedido/save', function (Request $request) {
-    $carts = Carrito::where('chatbot_id', $request->chatbot_id)->with('producto')->get();
+    $carts = Carrito::where('chatbot_id', $request->chatbot_id)->with('producto', 'extras')->get();
     $newpedido = Pedido::create([
         'cliente_id' => $request->cliente_id,
         'pago_id' => $request->pago_id,
@@ -142,9 +174,11 @@ Route::post('pedido/save', function (Request $request) {
         'descuento' => 0,
         'total'=>0,
     ]);
+
+    //productos------
     $mitotal = 0;
     foreach ($carts as $item) {
-        PedidoDetalle::create([
+        $detalle= PedidoDetalle::create([
             'producto_id' => $item->producto_id,
             'pedido_id' =>  $newpedido->id,
             'precio'=> $item->precio,
@@ -155,16 +189,36 @@ Route::post('pedido/save', function (Request $request) {
             'negocio_id'=> $item->negocio_id
         ]);
         $mitotal += $item->precio * $item->cantidad;
+        //extras---------
+        foreach ($item->extras as $value) {
+            Extrapedido::create([
+                'extra_id' => $value->extra_id,
+                'precio' =>  $value->precio,
+                'cantidad'=> $value->cantidad,
+                'total' => $value->total,
+                'pedido_id' => $newpedido->id,
+                'pedido_detalle_id' =>$detalle->id
+            ]);
+            $mitotal += $value->precio * $value->cantidad;
+        }
     }
     $miupdate = Pedido::find($newpedido->id);
     $miupdate->total = $mitotal-($miupdate->descuento);
     $miupdate->save();
-    Carrito::where('chatbot_id', $request->chatbot_id)->delete();
-    $lastpedido = Pedido::where('id', $newpedido->id)->with('cliente', 'productos', 'ubicacion', 'mensajero', 'banipay')->first();
-    return $lastpedido;
+
+    // vaciando carrito
+    $carritodel = Carrito::where('chatbot_id', $request->chatbot_id)->get();
+    foreach ($carritodel as $item) {
+        Extracarrito::where('carrito_id', $item->id)->delete();
+    }
+    return Pedido::find($newpedido->id);
 });
 
 Route::post('chatbot/cart/clean', function (Request $request) {
+    $carrito= Carrito::where('chatbot_id', $request->chatbot_id)->get();
+    foreach ($carrito as $item) {
+        Extracarrito::where('carrito_id', $item->id)->delete();
+    }
     return Carrito::where('chatbot_id', $request->chatbot_id)->delete();
 });
 Route::get('filtros/{negocio_id}', function ($negocio_id) {
@@ -184,9 +238,12 @@ Route::get('cliente/{phone}', function ($phone) {
         return $newcliente;
     }
 });
+
 Route::post('cliente/update/nombre', function (Request $request) {
     $cliente = Cliente::find($request->id);
     $cliente->nombre = $request->nombre;
+    $cliente->modo = 'cliente';
+    $cliente->poblacion_id = 1;
     $cliente->save();
     $newcliente = Cliente::find($request->id);
     return $newcliente;
@@ -200,6 +257,21 @@ Route::post('cliente/update/localidad', function (Request $request) {
     return $newcliente;
 });
 
+Route::post('cliente/modo/update', function (Request $request) {
+    $cliente = Cliente::where('chatbot_id', $request->phone)->first();
+    $cliente->modo = $request->modo;
+    $cliente->save();
+    $newcliente = Cliente::find($cliente->id);
+    return $newcliente;
+});
+
+Route::post('cliente/modo/cliente', function (Request $request) {
+    $cliente = Cliente::where('chatbot_id', $request->phone)->first();
+    $cliente->modo = 'cliente';
+    $cliente->save();
+    $newcliente = Cliente::find($cliente->id);
+    return $newcliente;
+});
 
 //ubicacion ---------
 Route::post('ubicacion/save', function (Request $request) {
@@ -218,33 +290,46 @@ Route::post('ubicacion/update', function (Request $request) {
     return $ubicacion;
 });
 
-Route::post('ubicacion/update', function (Request $request) {
-    $ubicacion = Ubicacione::find($request->id);
-    $ubicacion->detalles = $request->detalle;
-    $ubicacion->save();
-    return $ubicacion;
+Route::get('ubicacion/{id}', function ($id) {
+    return Ubicacione::find($id);
 });
 
 
 //pedidos
 Route::get('pedidos/{phone}', function ($phone) {
     return Pedido::where('chatbot_id', $phone)->orderBy('created_at', 'desc')->with('estado', 'mensajero', 'productos')->get();
-
 });
+
+Route::get('pedidos/get/encola', function () {
+    return Pedido::where('estado_id', 1)->orderBy('created_at', 'desc')->with('estado', 'cliente', 'productos', 'ubicacion')->get();
+});
+
 
 //Mensajeros libres de la Poblacion
 Route::get('mensajeros/libre/{poblacion_id}', function($poblacion_id){
     return Mensajero::where('estado', 1)->where('poblacion_id', $poblacion_id)->get();
 });
 
+Route::get('mensajeros', function(){
+    return Mensajero::all();
+});
+
 //Negocios del Pedido
 Route::get('negocios/pedido/{midata}', function($midata){
     return Pedido::where('id', $midata)->with('productos')->first();
 });
+Route::post('negocios/tipo', function(Request $request){
+    return Negocio::where('tipo_id', $request->tipo)->where('estado', true)->where('poblacion_id', $request->localidad)->with('productos', 'tipo')->get();
+});
+
+//TIPO
+Route::get('tipo/negocios', function(){
+    return Tipo::with('negocios')->get();
+});
 
 //Buscar Pedido con Cliente
  Route::get('pedido/{id}', function($id){
-    return Pedido::where('id', $id)->with('cliente', 'productos', 'ubicacion', 'mensajero', 'banipay', 'banipaydos')->first();
+    return Pedido::where('id', $id)->with('cliente', 'productos', 'ubicacion', 'mensajero', 'banipaydos')->first();
  });
 
  //Asignar Pedido a Mensajero
@@ -309,7 +394,9 @@ Route::get('mensajero/pedidos/{phone}', function($phone){
     $pedidos = Pedido::where('mensajero_id', $mimsg->id)->with('productos', 'cliente', 'pasarela', 'estado')->get();
     return $pedidos;
 });
-
+Route::get('mensajero/get/{telefono}', function($telefono){
+    return Mensajero::where('telefono', $telefono)->first();
+});
 //Estado del Pedido Llevando
 Route::get('llevando/pedido/{id}', function($id){
     $pedido= Pedido::where('id', $id)->with('cliente', 'productos', 'ubicacion', 'mensajero')->first();
@@ -344,7 +431,7 @@ Route::post('pedido/comentario', function(Request $request){
 
 //poblaciones
 Route::get('poblaciones', function(){
-    return Poblacione::orderBy('created_at', 'desc')->get();
+    return Poblacione::all();
 });
 Route::get('poblacion/{id}', function ($id) {
     return Poblacione::find($id);
@@ -368,6 +455,10 @@ Route::get('fecha/doble/pedidos/{midata}', function($midata){
 Route::get('all/negocios', function(){
     return Negocio::all();
 });
+Route::get('negocio/get/{phone}', function($phone){
+    return Negocio::where('chatbot_id', $phone)->first();
+});
+
 Route::get('negocio/update/{phone}', function($phone){
     $mimsg =  Negocio::where('chatbot_id', $phone)->with('productos', 'poblacion')->first();
     // return $mimsg;
@@ -407,3 +498,128 @@ Route::post('update/pedido/delivery', function(Request $request){
     $pedido->save();
     return true;
 });
+
+//Obtener todos los extra por negocio
+Route::get('producto/extra/negocio/{negocio_id}', function($negocio_id){
+    return Extraproducto::where('negocio_id', $negocio_id)->get();
+});
+
+Route::get('producto/extra/get/{id}', function($id){
+    return Extraproducto::find($id);
+});
+
+
+//Restablecer Password Negocios-------
+Route::post('reset/pw/negocio', function(Request $request){
+    $negocio= Negocio::where('chatbot_id', $request->phone)->first();
+    $user=User::find($negocio->user_id);
+    $user->password=Hash::make($request->password);
+    $user->save();
+    return $user;
+});
+
+//Get User
+Route::get('user/{id}', function($id){
+    return User::find($id);
+});
+
+//Get Negocio del User
+Route::get('user/negocio/{id}', function($id){
+    return Negocio::where('user_id', $id)->with('productos', 'extras')->first();
+});
+
+//PedidoDetalle por Negocio
+Route::get('pedido/detalle/negocio/{negocio_id}', function($negocio_id){
+    return PedidoDetalle::where('negocio_id', $negocio_id)->orderBy('id', 'desc')->with('pedido')->get();
+});
+
+//Cliente por ID
+Route::get('find/cliente/{id}', function($id){
+    return Cliente::find($id);
+});
+
+//Pasarela por ID
+Route::get('find/pago/{id}', function($id){
+    return Pago::find($id);
+});
+
+//Estado por ID
+Route::get('find/estado/{id}', function($id){
+    return Estado::find($id);
+});
+
+//Pedido por ID
+Route::get('find/pedido/{id}', function($id){
+    return Pedido::where('id', $id)->with('cliente', 'mensajero', 'pasarela', 'estado', 'ubicacion')->get();
+});
+
+Route::get('extra/{id}', function($id){
+    return Extrapedido::where('pedido_detalle_id', $id)->with('extra')->get();
+});
+
+Route::get('reporte/fechas/negocio/{midata}', function($midata){
+    $midata2=json_decode($midata);
+
+    $detalle= PedidoDetalle::where('negocio_id', $midata2->negocio_id)->whereBetween('created_at', [$midata2->date1, $midata2->date2])->with('extras', 'pedido')->get();
+    $pedido_id=[];
+    $pedido=[];
+    $cantidad=0;
+    $efectivo=0;
+    $total_efectivo=0;
+    $banipay=0;
+    $total_banipay=0;
+    $total_extras=0;
+    $aux_total=0;
+    foreach ($detalle as $item) {
+        array_push($pedido_id, $item->pedido_id);
+        if ($item->extras!=null) {
+            foreach ($item->extras as $value) {
+                $total_extras+=$value->total;
+                $aux_total+=$value->total;
+            }
+           
+        }
+        if ($item->pedido->pago_id==1) {
+            $total_efectivo+=$aux_total+$item->total;
+        }
+        else{
+            $total_banipay+=$aux_total+$item->total;
+        }
+        $aux_total=0;
+    }
+    $arraypedido_id= array_unique($pedido_id);
+
+    
+
+    foreach ($arraypedido_id as $item) {
+        $aux= Pedido::where('id', $item)->with('cliente', 'mensajero', 'pasarela', 'estado', 'ubicacion', 'extras')->first();
+        array_push($pedido, $aux);
+        $cantidad += 1;
+        if ($aux->pago_id==1) {
+            $efectivo+=1;
+            //$total_efectivo+=$aux->total;
+        }
+        else{
+            $banipay+=1;
+            //$total_banipay+=$aux->total;
+        }
+    }
+
+    $total_detalle = PedidoDetalle::where('negocio_id', $midata2->negocio_id)->whereBetween('created_at', [$midata2->date1, $midata2->date2])->sum('total');
+    $total=$total_detalle+$total_extras;
+
+    return response()->json([
+        'cantidad_total' => $cantidad,
+        'total' => $total,
+        'cantidad_efectivo' => $efectivo,
+        'cantidad_banipay' => $banipay,
+        'total_efectivo' => $total_efectivo,
+        'total_banipay' => $total_banipay,
+        'total_extras' => $total_extras
+    ]);
+});
+
+Route::get('rel/precios/producto/{id}', function($id){
+    return RelProductoPrecio::where('producto_id', $id)->with('precios')->get();
+});
+

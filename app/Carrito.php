@@ -15,7 +15,7 @@ class Carrito extends Model
         'precio',
         'cantidad',
         'negocio_id',
-        'negocio_name'
+        'negocio_name',
     ];
     protected $appends=['published', 'fecha'];
 	public function getPublishedAttribute(){
@@ -31,6 +31,10 @@ class Carrito extends Model
     public function negocio()
     {
         return $this->belongsTo(Negocio::class, 'negocio_id');
+    }
+    public function extras()
+    {
+        return $this->hasMany(Extracarrito::class);
     }
     
 }

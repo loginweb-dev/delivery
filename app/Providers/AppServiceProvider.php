@@ -27,6 +27,10 @@ class AppServiceProvider extends ServiceProvider
         //
 
         Voyager::addAction(\App\Actions\PedidoDetalle::class);
+        Voyager::addAction(\App\Actions\Comentario::class);
+        Voyager::addAction(\App\Actions\ExtraPedido::class);
+
+
 
     }
 }

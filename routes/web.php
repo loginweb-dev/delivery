@@ -21,7 +21,7 @@ Route::get('/nosotros', function () {
     return view('welcome');
 });
 
-Route::get('/markplace', function () {
+Route::get('/marketplace', function () {
     return view('markplace');
 });
 
@@ -31,9 +31,14 @@ Route::get('mensajero/{chatbot_id}', function ($chatbot_id) {
 });
 
 Route::get('negocio/{slug}', function ($slug) {
-    $negocio = App\Negocio::where('slug', $slug)->first();
+    $negocio = App\Negocio::where('slug', $slug)->with('productos')->first();
     return view('minegocio', compact('negocio')); 
 })->name('negocio');
+
+Route::get('producto/{id}', function ($id) {
+    $producto = App\Producto::where('id', $id)->first();
+    return view('producto', compact('producto')); 
+})->name('producto');
 
 Route::get('cliente/{phone}', function ($phone) {
     $pedidos = App\Negocio::where('chatbot_id', $phone)->first();
@@ -42,4 +47,14 @@ Route::get('cliente/{phone}', function ($phone) {
 
 Route::group(['prefix' => 'admin'], function () {
     Voyager::routes();
+    Route::get('/mispedidos/{id}', function ($id) {
+        $negocio= App\Negocio::find($id);
+        return view('pedidos.mipedidos', compact('negocio'));
+    })->name('mispedidos');
+    Route::get('pedidos/midetalle/{id}', function ($id) {
+        // $detalle= App\PedidoDetalle::where('pedido_id', $id)->with('negocio', 'extras')->get();
+        
+        return view('detalles.midetalle', compact('id'));
+    })->name('midetalle');
 });
+

@@ -6,15 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Carbon\Carbon;
+use TCG\Voyager\Traits\Resizable;
 class Negocio extends Model
 {
     
 	use SoftDeletes;
-    // protected $fillable = [
-    //     'nombre',
-    //     'direccion',
-    //     'problacion_id'
-    // ];
+  use Resizable;
 
     protected $appends=['published', 'fecha'];
     public function getPublishedAttribute(){
@@ -35,5 +32,9 @@ class Negocio extends Model
     public function tipo()
     {
         return $this->belongsTo(Tipo::class, 'tipo_id');
+    }
+    public function extras()
+    {
+        return $this->hasMany(Extraproducto::class);
     }
 }

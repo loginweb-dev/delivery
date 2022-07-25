@@ -73,9 +73,6 @@ $(function() {
 	})
 
 	$(".chat-box-toggle").click(function() {
-	  pb.error(
-		'Cerrando Chats'
-	  );
 	  $("#chat-circle").toggle('scale')
 	  $(".chat-box").toggle('scale')
 	})
