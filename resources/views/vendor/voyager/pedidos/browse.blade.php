@@ -37,7 +37,7 @@
 @stop
 
 @section('content')
-    @if(Auth::user()->role_id==3)
+    @if(Auth::user()->role_id==3 || Auth::user()->role_id==4 )
         <div id="voyager-loader" class="mireload">
             <?php $admin_loader_img = Voyager::setting('admin.loader', ''); ?>
             @if($admin_loader_img == '')
@@ -62,8 +62,8 @@
                                                 <option value="{{ $key }}" @if($search->key == $key || (empty($search->key) && $key == $defaultSearchKey)) selected @endif>{{ $name }}</option>
                                             @endforeach --}}
                                             <option value="id">Buscar por ID</option>
-                                            <option value="reporte_diario">Reporte del Día</option>
-                                            <option value="ventas_fecha">Ventas por Fecha</option>
+                                            <option value="reporte_diario">Ventas por Fecha</option>
+                                            {{-- <option value="ventas_fecha">Ventas por Fecha</option> --}}
                                         </select>
                                     </div>
                                     <div class="col-2">
@@ -477,6 +477,17 @@
                 if (url_destino!=url_actual) {
                     location.href=url_destino
                 }
+            }
+            else if (user.data.role_id==4) {
+                var url_destino="{{route('pedidosmensajero', 'mivariable')}}"
+                url_destino= url_destino.replace('mivariable', user.data.id)
+                var url_actual=window.location.href  
+                if (url_destino!=url_actual) {
+                    location.href=url_destino
+                }
+            }
+            else{
+                $('.mireload').attr("hidden", true)
             }
         }
         $('#search_key').on('change', async function() {

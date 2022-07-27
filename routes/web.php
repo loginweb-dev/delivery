@@ -56,5 +56,9 @@ Route::group(['prefix' => 'admin'], function () {
         
         return view('detalles.midetalle', compact('id'));
     })->name('midetalle');
+    Route::get('/pedidosmensajero/{id}', function ($id) {
+        // $negocio= App\Negocio::find($id);
+        return view('pedidos.pedidosmensajero', compact('id'));
+    })->name('pedidosmensajero');
 });
 

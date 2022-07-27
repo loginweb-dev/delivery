@@ -529,8 +529,9 @@ Route::get('user/negocio/{id}', function($id){
 });
 
 //PedidoDetalle por Negocio
-Route::get('pedido/detalle/negocio/{negocio_id}', function($negocio_id){
-    return PedidoDetalle::where('negocio_id', $negocio_id)->orderBy('id', 'desc')->with('pedido')->get();
+Route::get('pedido/detalle/negocio/{midata}', function($midata){
+    $midata2=json_decode($midata);
+    return PedidoDetalle::where('negocio_id', $midata2->negocio_id)->whereBetween('created_at', [$midata2->date1, $midata2->date2])->orderBy('id', 'desc')->with('pedido')->get();
 });
 
 //Cliente por ID
@@ -550,7 +551,7 @@ Route::get('find/estado/{id}', function($id){
 
 //Pedido por ID
 Route::get('find/pedido/{id}', function($id){
-    return Pedido::where('id', $id)->with('cliente', 'mensajero', 'pasarela', 'estado', 'ubicacion')->get();
+    return Pedido::where('id', $id)->with('cliente', 'mensajero', 'pasarela', 'estado', 'ubicacion', 'productos')->get();
 });
 
 Route::get('extra/{id}', function($id){
@@ -621,5 +622,60 @@ Route::get('reporte/fechas/negocio/{midata}', function($midata){
 
 Route::get('rel/precios/producto/{id}', function($id){
     return RelProductoPrecio::where('producto_id', $id)->with('precios')->get();
+});
+
+Route::get('find/comentario/{pedido_id}', function($pedido_id){
+    return Comentario::where('pedido_id', $pedido_id)->first();
+});
+
+//Pedido por Mensajero
+Route::get('pedido/mensajero/{midata}', function($midata){
+    $midata2=json_decode($midata);
+    return Pedido::where('mensajero_id', $midata2->mensajero_id)->whereBetween('created_at', [$midata2->date1, $midata2->date2])->orderBy('id', 'desc')->with('cliente', 'mensajero', 'pasarela', 'estado', 'ubicacion')->get();
+});
+
+Route::get('ventas/fechas/mensajero/{midata}', function($midata){
+    $midata2=json_decode($midata);
+    $pedidos = Pedido::where('mensajero_id', $midata2->mensajero_id)->whereBetween('created_at', [$midata2->date1, $midata2->date2])->get();
+    // $cantidad = Pedido::where('mensajero_id', $midata2->mensajero_id)->whereBetween('created_at', [$midata2->date1, $midata2->date2])->count();
+    // $cantidad_efectivo = Pedido::where('mensajero_id', $midata2->mensajero_id)->where('pago_id', 1)->whereBetween('created_at', [$midata2->date1, $midata2->date2])->count();
+    // $total_efectivo= Pedido::where('mensajero_id', $midata2->mensajero_id)->where('pago_id', 1)->whereBetween('created_at', [$midata2->date1, $midata2->date2])->sum('total');
+    // $cantidad_banipay= Pedido::where('mensajero_id', $midata2->mensajero_id)->where('pago_id', 2)->whereBetween('created_at', [$midata2->date1, $midata2->date2])->count();
+    // $total_banipay= Pedido::where('mensajero_id', $midata2->mensajero_id)->where('pago_id', 1)->whereBetween('created_at', [$midata2->date1, $midata2->date2])->sum('total');
+    $cantidad=0;
+    $total=0;
+    $cantidad_efectivo=0;
+    $cantidad_banipay=0;
+    $total_efectivo=0;
+    $total_banipay=0;
+    $total_negocio=0;
+    $total_delivery=0;
+
+    foreach ($pedidos as $item) {
+        if ($item->pago_id==1) {
+            $cantidad_efectivo+=1;
+            $total_efectivo+=($item->total+$item->total_delivery);
+        }
+        if ($item->pago_id==2) {
+            $cantidad_banipay+=1;
+            $total_banipay+=($item->total+$item->total_delivery);
+        }
+        $cantidad+=1;
+        $total+=($item->total+$item->total_delivery);
+        $total_negocio+=$item->total;
+        $total_delivery+=$item->total_delivery;
+
+    }
+    return response()->json([
+        'cantidad_total' => $cantidad,
+        'total' => $total,
+        'cantidad_efectivo' => $cantidad_efectivo,
+        'cantidad_banipay' => $cantidad_banipay,
+        'total_efectivo' => $total_efectivo,
+        'total_banipay' => $total_banipay,
+        'total_negocio' => $total_negocio,
+        'total_delivery' => $total_delivery
+
+    ]);
 });
 

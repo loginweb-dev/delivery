@@ -29,8 +29,8 @@
                                 <div class="col-4">
                                     <select id="search_key" name="key" style="width: 300px" class="form-control js-example-basic-single">
                                             <option value="id">Buscar por ID</option>
-                                            <option value="reporte_diario">Reporte del Día</option>
-                                            <option value="ventas_fecha">Ventas por Fecha</option>            
+                                            <option value="reporte_diario">Ventas por Fecha</option>
+                                            <option value="listar_ventas">Listado</option>            
                                     </select>
                                 </div>
                                 <div class="col-2">
@@ -330,6 +330,37 @@
             </div>
         </div>
     </div>
+    <div class="modal modal-primary fade" tabindex="-1" id="modal_lista" role="dialog">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                   <button type="button" class="close" data-dismiss="modal" aria-label="{{ __('voyager::generic.close') }}"><span aria-hidden="true">&times;</span></button>
+                   <h4 class="modal-title">Listar Ventas por Fechas</h4>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <label for="">Fecha Inicial</label>
+                            <input class="form-control" type="date" name="date1Lista" id="date1Lista">
+                        </div>
+                        <div class="col-sm-6">
+                            <label for="">Fecha Final</label>
+                            <input class="form-control" type="date" name="date2Lista" id="date2Lista">
+                        </div>
+                        <div class="col-sm-6">
+                            <button onclick="Listar()" class="btn btn-primary">Listar</button>
+                        </div>
+                    </div>
+                    <ul class="nav nav-tabs">
+                        <li class="active"><a data-toggle="tab" href="#home22">Resumen</a></li>
+                        {{-- <li><a data-toggle="tab" href="#menu11">Listado</a></li> --}}
+                    </ul>
+                    
+                    
+                </div>
+            </div>
+        </div>
+    </div>
 @stop
 @section('javascript')
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
@@ -337,7 +368,8 @@
         $('document').ready(function () {
             recargar()
             $('.js-example-basic-single').select2();
-            pedidos()
+            // pedidos()
+            ListarDefecto()
         });
         async function recargar(){
             var user_id= '{{Auth::user()->id}}'
@@ -361,19 +393,29 @@
             }
         }
 
-        async function pedidos(){
+        async function pedidos(fecha_inicial, fecha_final){
             var id='{{$negocio->id}}'
             var pedido_id=[]
             $("#dataTable tbody tr").remove();
             var mitable=""
-            var pedido_detalles= await axios("{{setting('admin.url')}}api/pedido/detalle/negocio/"+id)
+            var fecha_ini= fecha_inicial
+            var fecha_fin= fecha_final
+            //Pedir solo Pedidos del día
+            var midata = JSON.stringify({
+                date1: fecha_ini,
+                date2: fecha_fin,
+                negocio_id: id
+            })
+
+            var pedido_detalles= await axios("{{setting('admin.url')}}api/pedido/detalle/negocio/"+midata)
             for (let index = 0; index < pedido_detalles.data.length; index++) {
                
                 if (pedido_id.indexOf(pedido_detalles.data[index].pedido.id) === -1) {
                     pedido_id.push(pedido_detalles.data[index].pedido.id)
                     var pedido= await axios("{{setting('admin.url')}}api/find/pedido/"+pedido_detalles.data[index].pedido.id)
-                    mitable+="<tr><td>"+pedido.data[0].id+"</td><td>"+pedido.data[0].fecha+"</td><td>"+pedido.data[0].cliente.nombre+"</td><td>"+pedido.data[0].mensajero.nombre+"</td><td>"+pedido.data[0].total+"</td><td>"+pedido.data[0].total_delivery+"</td><td>"+pedido.data[0].negocios+"</td><td>"+pedido.data[0].pasarela.title+"</td><td>"+pedido.data[0].estado.nombre+"</td><td>"+pedido.data[0].ubicacion.detalles+"</td><td><a class='btn btn-success' href='{{setting('admin.url')}}admin/pedidos/midetalle/"+pedido.data[0].id+"'>Detalles</a><a class='btn btn-warning' href='{{setting('admin.url')}}admin/comentarios?key=pedido_id&filter=equals&s="+pedido.data[0].id+"'>Comentarios</a></td></tr>"
-            
+                    // mitable+="<tr><td>"+pedido.data[0].id+"</td><td>"+pedido.data[0].fecha+"</td><td>"+pedido.data[0].cliente.nombre+"</td><td>"+pedido.data[0].mensajero.nombre+"</td><td>"+pedido.data[0].total+"</td><td>"+pedido.data[0].total_delivery+"</td><td>"+pedido.data[0].negocios+"</td><td>"+pedido.data[0].pasarela.title+"</td><td>"+pedido.data[0].estado.nombre+"</td><td>"+pedido.data[0].ubicacion.detalles+"</td><td><a class='btn btn-success' href='{{setting('admin.url')}}admin/pedidos/midetalle/"+pedido.data[0].id+"'>Detalles</a><a class='btn btn-warning' href='{{setting('admin.url')}}admin/comentarios?key=pedido_id&filter=equals&s="+pedido.data[0].id+"'>Comentarios</a></td></tr>"
+                    mitable+="<tr><td>"+pedido.data[0].id+"</td><td>"+pedido.data[0].fecha+"</td><td>"+pedido.data[0].cliente.nombre+"</td><td>"+pedido.data[0].mensajero.nombre+"</td><td>"+pedido.data[0].total+"</td><td>"+pedido.data[0].total_delivery+"</td><td>"+pedido.data[0].negocios+"</td><td>"+pedido.data[0].pasarela.title+"</td><td>"+pedido.data[0].estado.nombre+"</td><td>"+pedido.data[0].ubicacion.detalles+"</td><td><a class='btn btn-success' href='{{setting('admin.url')}}admin/pedidos/midetalle/"+pedido.data[0].id+"'>Detalles</a></td></tr>"
+
                 }            
             }
             
@@ -395,8 +437,9 @@
                     $('#modal_reportes').modal();
                     
                     break;
-                case 'ventas_fecha':
-                  
+                case 'listar_ventas':
+                    $('#modal_lista').modal();
+
                     break;
                 default:
                     //Declaraciones ejecutadas cuando ninguno de los valores coincide con el valor de la expresión
@@ -407,12 +450,34 @@
             if ( event.which == 13 ) {
                 var id= $('#s').val()
                 var pedido= await axios("{{setting('admin.url')}}api/find/pedido/"+id)
-                if (pedido.data) {
-                    $("#dataTable tbody tr").remove();
-                    var mitable=""
-                    mitable+="<tr><td>"+pedido.data[0].id+"</td><td>"+pedido.data[0].fecha+"</td><td>"+pedido.data[0].cliente.nombre+"</td><td>"+pedido.data[0].mensajero.nombre+"</td><td>"+pedido.data[0].total+"</td><td>"+pedido.data[0].total_delivery+"</td><td>"+pedido.data[0].negocios+"</td><td>"+pedido.data[0].pasarela.title+"</td><td>"+pedido.data[0].estado.nombre+"</td><td>"+pedido.data[0].ubicacion.detalles+"</td><td><a class='btn btn-success' href='{{setting('admin.url')}}admin/pedidos/midetalle/"+pedido.data[0].id+"'>Detalles</a><a class='btn btn-warning' href='{{setting('admin.url')}}admin/comentarios?key=pedido_id&filter=equals&s="+pedido.data[0].id+"'>Comentarios</a></td></tr>"
-                    $('#dataTable').append(mitable);
+                var user_id= '{{Auth::user()->id}}'
+                var negocio= await axios("{{setting('admin.url')}}api/user/negocio/"+user_id)
 
+                if (pedido.data.length!=0) {
+                    var validador=false
+                    for (let index = 0; index < pedido.data.productos.length; index++) {
+                        if (pedido.data.productos[index].negocio_id==negocio.data.id) {
+                            validador=true
+                        }
+                    }
+                    if (validador) {
+                        $("#dataTable tbody tr").remove();
+                        var mitable=""
+                        mitable+="<tr><td>"+pedido.data[0].id+"</td><td>"+pedido.data[0].fecha+"</td><td>"+pedido.data[0].cliente.nombre+"</td><td>"+pedido.data[0].mensajero.nombre+"</td><td>"+pedido.data[0].total+"</td><td>"+pedido.data[0].total_delivery+"</td><td>"+pedido.data[0].negocios+"</td><td>"+pedido.data[0].pasarela.title+"</td><td>"+pedido.data[0].estado.nombre+"</td><td>"+pedido.data[0].ubicacion.detalles+"</td><td><a class='btn btn-success' href='{{setting('admin.url')}}admin/pedidos/midetalle/"+pedido.data[0].id+"'>Detalles</a><a class='btn btn-warning' href='{{setting('admin.url')}}admin/comentarios?key=pedido_id&filter=equals&s="+pedido.data[0].id+"'>Comentarios</a></td></tr>"
+                        $('#dataTable').append(mitable);
+                    }
+                    else{
+                        // pb.info(
+                        //     'En el Pedido solicitado tu negocio no estuvo presente.'
+                        // );
+                        toastr.error("En el Pedido solicitado tu negocio no estuvo presente.")
+                    }
+                }
+                else{
+                    // pb.info(
+                    //         'El Pedido Solicitado no se encuentra'
+                    //     );
+                    toastr.error("El Pedido Solicitado no se encuentra.")
                 }
                
             }
@@ -420,7 +485,7 @@
         async function ReporteDiario(id){
             // report_table
             var midata1 = $("#date1").val()
-            var midata2 = $("#date2").val()
+            var midata2 = fechaFinal($("#date2").val())
             var negocio_id = id
             var midata = JSON.stringify({
                 date1: midata1,
@@ -444,6 +509,83 @@
             $('#report_table').append("<tr><td>Total para GoDelivery: </td><td> "+total_godelivery+"</td></tr>");
 
                
+        }
+
+        function sumarDias(fecha, dias){
+            fecha.setDate(fecha.getDate() + dias);
+            return fecha;
+        }
+
+        function fechaFinal(midata2) {
+            var dia=""
+            var mes=""
+            var year=""
+
+            var fecha = new Date(midata2);
+            var fecha_funcion=sumarDias(fecha, 2)
+            var dia=((fecha_funcion).getDate()).toString()
+            dia= dia.padStart(2,'0')
+            
+            var mes=((fecha_funcion).getMonth()+1).toString()
+            mes= mes.padStart(2,'0') 
+
+            var year=((fecha_funcion).getFullYear()).toString()
+            
+            var fecha_salida=""
+            fecha_salida= year+"-"+mes+"-"+dia
+            return fecha_salida;
+        }
+
+        function fechaDefectoPedidos(validador) {
+            if (validador) {
+                var dia=""
+                var mes=""
+                var year=""
+
+                var fecha = new Date();
+                var dia=((fecha).getDate()).toString()
+                dia= dia.padStart(2,'0')
+                
+                var mes=((fecha).getMonth()+1).toString()
+                mes= mes.padStart(2,'0') 
+
+                var year=((fecha).getFullYear()).toString()
+                
+                var fecha_salida=""
+                fecha_salida= year+"-"+mes+"-"+dia
+                return fecha_salida;
+            }
+            else{
+                var dia=""
+                var mes=""
+                var year=""
+
+                var fecha = new Date();
+                var fecha_funcion=sumarDias(fecha, 2)
+                var dia=((fecha_funcion).getDate()).toString()
+                dia= dia.padStart(2,'0')
+                
+                var mes=((fecha_funcion).getMonth()+1).toString()
+                mes= mes.padStart(2,'0') 
+
+                var year=((fecha_funcion).getFullYear()).toString()
+                
+                var fecha_salida=""
+                fecha_salida= year+"-"+mes+"-"+dia
+                return fecha_salida;
+            }
+        }
+        async function Listar(){
+            var fecha_inicial = $("#date1Lista").val()
+            var fecha_final = fechaFinal($("#date2Lista").val())
+            pedidos(fecha_inicial, fecha_final)
+
+        }
+        function ListarDefecto(){
+            var fecha_inicial = fechaDefectoPedidos(1)
+            var fecha_final = fechaDefectoPedidos(0)
+            pedidos(fecha_inicial, fecha_final)
+
         }
 
     </script>

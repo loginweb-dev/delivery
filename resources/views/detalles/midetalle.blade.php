@@ -74,8 +74,19 @@
         async function Detalles(){
             $("#dataTable tbody tr").remove();
             var detalle= await axios("{{setting('admin.url')}}api/pedido/negocios/"+'{{$id}}')
+            var comentario = await axios("{{setting('admin.url')}}api/find/comentario/"+'{{$id}}')
             //console.log(detalle.data)
             var list=""
+            
+            var validador=false;
+
+            var user_id= '{{Auth::user()->id}}'
+            var user= await axios("{{setting('admin.url')}}api/user/"+user_id)
+            if (user.data.role_id==3) {
+                var negocio= await axios("{{setting('admin.url')}}api/user/negocio/"+user_id)
+                
+            }
+
             for (let index = 0; index < detalle.data.length; index++) {
                 list+="<tr><td><h5>Producto</h5></td><td>"+detalle.data[index].producto_name+"</td><td>"+detalle.data[index].negocio_name+"</td><td>"+detalle.data[index].precio+"</td><td>"+detalle.data[index].cantidad+"</td><td>"+detalle.data[index].total+"</td></tr>"
                 if (detalle.data[index].extras) {
@@ -84,10 +95,29 @@
                         list+="<tr><td>--> Extra</td><td>"+extra.data.nombre+"</td><td></td><td>"+detalle.data[index].extras[j].precio+"</td><td>"+detalle.data[index].extras[j].cantidad+"</td><td>"+detalle.data[index].extras[j].total+"</td></tr>"
                     }
                 }
+                if (user.data.role_id==3 && negocio.data.id==detalle.data[index].negocio_id ) {
+                    validador=true;
+                }
             }
-            $('.mireload').attr("hidden", true)
-            $('#dataTable').append(list);
+            if (comentario.data) {
+                list+="<tr><td>--* Comentario:</td><td>"+comentario.data.description+"</td><td></td><td></td><td></td><td></td></tr>"
+            }
+
+            if (validador) {
+                $('.mireload').attr("hidden", true)
+                $('#dataTable').append(list);
+            }
+            else{
+                if (user.data.role_id==3) {
+                    var url_destino="{{route('mispedidos', 'mivariable')}}"
+                    url_destino= url_destino.replace('mivariable', negocio.data.id)
+                    location.href=url_destino
+                }
+            }
+            
+           
         }
+        
 
      
     </script>

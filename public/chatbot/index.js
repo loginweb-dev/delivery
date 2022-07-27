@@ -87,36 +87,36 @@ client.on('message', async msg => {
                     //reest
                         if (msg.body === 'reset') {
                             status.set(msg.from, 0)
-                            status_mensajero.set(msg.from, 0)
-                            status_negocio.set(msg.from, 0)
+                            // status_mensajero.set(msg.from, 0)
+                            // status_negocio.set(msg.from, 0)
                             await axios.post(process.env.APP_URL+'api/chatbot/cart/clean', {chatbot_id: msg.from})
     
-                            var mitipos = await axios(process.env.APP_URL+'api/tipo/negocios')
-                            for (let index = 0; index < mitipos.data.length; index++) {
-                                tipos.set('A'+mitipos.data[index].id, mitipos.data[index].id);
-                            }
+                            // var mitipos = await axios(process.env.APP_URL+'api/tipo/negocios')
+                            // for (let index = 0; index < mitipos.data.length; index++) {
+                            //     tipos.set('A'+mitipos.data[index].id, mitipos.data[index].id);
+                            // }
     
-                            var mispoblaciones = await axios(process.env.APP_URL+'api/poblaciones')
-                            for (let index = 0; index < mispoblaciones.data.length; index++) {
-                                localidades.set('Z'+mispoblaciones.data[index].id, mispoblaciones.data[index].id)
-                            }
+                            // var mispoblaciones = await axios(process.env.APP_URL+'api/poblaciones')
+                            // for (let index = 0; index < mispoblaciones.data.length; index++) {
+                            //     localidades.set('Z'+mispoblaciones.data[index].id, mispoblaciones.data[index].id)
+                            // }
     
-                            var mibussiness = await axios(process.env.APP_URL+'api/bussiness')
-                            for (let index = 0; index < mibussiness.data.length; index++) {
-                                bussiness.set(mibussiness.data[index].chatbot_id, mibussiness.data[index].id)
-                            }
+                            // var mibussiness = await axios(process.env.APP_URL+'api/bussiness')
+                            // for (let index = 0; index < mibussiness.data.length; index++) {
+                            //     bussiness.set(mibussiness.data[index].chatbot_id, mibussiness.data[index].id)
+                            // }
     
-                            var mimensajeros = await axios(process.env.APP_URL+'api/mensajeros')
-                            for (let index = 0; index < mimensajeros.data.length; index++) {
-                                mensajeros.set(mimensajeros.data[index].telefono, mimensajeros.data[index].id)
-                            }
+                            // var mimensajeros = await axios(process.env.APP_URL+'api/mensajeros')
+                            // for (let index = 0; index < mimensajeros.data.length; index++) {
+                            //     mensajeros.set(mimensajeros.data[index].telefono, mimensajeros.data[index].id)
+                            // }
 
-                            var midata = {
-                                phone: msg.from,
-                                modo: 'cliente'
-                            }
-                            await axios.post(process.env.APP_URL+'api/cliente/modo/update', midata)
-                            client.sendMessage(msg.from, 'reset ok')                        
+                            // var midata = {
+                            //     phone: msg.from,
+                            //     modo: 'cliente'
+                            // }
+                            // await axios.post(process.env.APP_URL+'api/cliente/modo/update', midata)
+                            // client.sendMessage(msg.from, 'reset ok')                        
                         }
                     if (micliente.data.modo === 'cliente') {
                         if (msg.body === '❌' || msg.body === '🚮') {
@@ -202,6 +202,7 @@ client.on('message', async msg => {
                                         break;
                                     case productos.has(msg.body.toUpperCase()):
                                         var miresponse = await axios(process.env.APP_URL+'api/producto/'+productos.get(msg.body.toUpperCase()))
+                                        var miprecios = []
                                         if (miresponse.data) {
                                             if (miresponse.data.negocio.poblacion_id==micliente.data.poblacion_id) {
                                                 var media = ''
@@ -214,31 +215,31 @@ client.on('message', async msg => {
                                                     var list = miresponse.data.nombre+' '+miresponse.data.precio+'Bs.\n'
                                                     list += miresponse.data.detalle+'\n'
                                                     list += '--------------------------\n'
-                                                    list += '*A* .- Añadir a carrito\n'  
+                                                    list += '*A* .- Añadir a carrito\n'
                                                     list += '*B* .- Seguir comprando\n'
                                                     list += 'Envia una opcion'
                                                     status.set(msg.from, 0.3)
+                                                    miprecios=miresponse.data.precio
                                                     client.sendMessage(msg.from, media, {caption: list})                                                    
                                                 } else {
-                                                    var miarray = ['A', 'B', 'C', 'D', 'F']
-                                                    var miprecios = []
+                                                    var miarray = ['A', 'B', 'C', 'D', 'E', 'F']                                    
                                                     var list = miresponse.data.nombre+'\n'
                                                     list += miresponse.data.detalle+'\n'
                                                     list += '--------------------------'+'\n'
                                                     for (let index = 0; index < miresponse.data.precios.length; index++) {
                                                         var precio = await axios(process.env.APP_URL+'api/precio/'+miresponse.data.precios[index].precio_id)
-                                                        list += '*'+miarray[index]+'* .- '+precio.data.nombre+'\n'
+                                                        list += '*'+miarray[index]+'* .- '+precio.data.nombre+' '+precio.data.precio+'Bs.\n'
                                                         miprecios.push({opcion: miarray[index], precio: precio.data.precio})
                                                     }                                                    
                                                     list += 'Envia una opcion'
-                                                    precios.set(msg.from, miprecios)
                                                     status.set(msg.from, 0.4)
                                                     client.sendMessage(msg.from, media, {caption: list})                                                    
                                                 }
                                                 if (miresponse.data.extra) {
-                                                    carts.set(msg.from, {id: miresponse.data.id, nombre: miresponse.data.nombre, precio: miresponse.data.precio, extra: true, negocio_id: miresponse.data.negocio_id, negocio_nombre: miresponse.data.negocio.nombre})
+                                                    var miextras = await axios(process.env.APP_URL+'api/producto/extra/negocio/'+miresponse.data.negocio_id)
+                                                    carts.set(msg.from, {id: miresponse.data.id, nombre: miresponse.data.nombre, precio: miprecios, extra: miextras.data, negocio_id: miresponse.data.negocio_id, negocio_nombre: miresponse.data.negocio.nombre})
                                                 }else{
-                                                    carts.set(msg.from, {id: miresponse.data.id, nombre: miresponse.data.nombre, precio: miresponse.data.precio, extra: false, negocio_id: miresponse.data.negocio_id, negocio_nombre: miresponse.data.negocio.nombre})
+                                                    carts.set(msg.from, {id: miresponse.data.id, nombre: miresponse.data.nombre, precio: miprecios, extra: false, negocio_id: miresponse.data.negocio_id, negocio_nombre: miresponse.data.negocio.nombre})
                                                 }
                                             }
                                             else{
@@ -258,12 +259,12 @@ client.on('message', async msg => {
                                 }
                                 break;
                             case 0.4:
-                                var miprecios = precios.get(msg.from)
+                                // var miprecios = precios.get(msg.from)
                                 var miproducto = carts.get(msg.from)
                                 var validar = false
-                                for (let index = 0; index < miprecios.length; index++) {
-                                    if (msg.body.toUpperCase() === miprecios[index].opcion) {
-                                        carts.set(msg.from, {id: miproducto.id, nombre: miproducto.nombre, precio: miprecios[index].precio, extra: miproducto.extra, negocio_id: miproducto.negocio_id, negocio_nombre: miproducto.negocio_nombre})
+                                for (let index = 0; index < miproducto.precio.length; index++) {
+                                    if (msg.body.toUpperCase() === miproducto.precios[index].opcion) {
+                                        carts.set(msg.from, {id: miproducto.id, nombre: miproducto.nombre, precios: miproducto.precios[index].precio, extras: miproducto.extras, negocio_id: miproducto.negocio_id, negocio_nombre: miproducto.negocio_nombre})
                                         validar = true
                                     }                                
                                 }                     
@@ -280,28 +281,15 @@ client.on('message', async msg => {
                                     client.sendMessage(msg.from, 'Ingresa un opcion valida')
                                 }                  
                                 break;
-                            case 0.3: //agregar producto + extreas
+                            case 0.3: //agregar producto + precios + extreas
                                 if (msg.body === 'A' || msg.body === 'a') {
                                     var miproducto = carts.get(msg.from)
                                     if (miproducto.extra) {
-                                        // await extras_list(msg.from)
-                                        // var list = 'Deseas agregar extras ?\nProducto: *'+miproducto.nombre+'* \n'
-                                        // list += '--------------------------\n'
-                                        // list += '*A* .- Si quiero\n'
-                                        // list += '*B* .- Esta vez no\n'
-                                        // list += 'Envia una opcion'                                    
-                                        // client.sendMessage(msg.from, list)
-                                        // status.set(msg.from, 0.5)
-
-                                        var product = await axios(process.env.APP_URL+'api/producto/'+miproducto.id)
-                                        var miresponse = await axios(process.env.APP_URL+'api/producto/extra/negocio/'+product.data.negocio_id)
-                                        var list = 'Te puede interesar los extras para el producto: *'+miproducto.nombre+'* \n'
-                                        list += '------------------------------------------\n'
-                                        for (let index = 0; index < miresponse.data.length; index++) {
-                                            list += '*E'+miresponse.data[index].id+'* .- '+miresponse.data[index].nombre+' ('+miresponse.data[index].precio+' Bs.)\n'
-                                            extras.set('E'+miresponse.data[index].id, miresponse.data[index].id)
+                                        var list = 'Te puede interesar los *EXTRAS* para el producto selecionado, '
+                                        for (let index = 0; index < miproducto.extra.length; index++) {
+                                            list += miproducto.extra[index].nombre+'('+miproducto.extra[index].precio+'Bs), '
                                         }
-                                        list += '------------------------------------------\n'
+                                        list += '\n------------------------------------------\n'
                                         list += 'Deseas agregar extras ?\n'
                                         list += '*A* .- Si quiero\n'
                                         list += '*B* .- Esta vez no\n'
@@ -309,7 +297,7 @@ client.on('message', async msg => {
                                         client.sendMessage(msg.from, list)
                                         status.set(msg.from, 0.5)
                                     } else if (msg.body === 'b' || msg.body === 'B') {
-                                        client.sendMessage(msg.from, 'Genial, ingresa una cantidad (1-9) para agragar a tu carrito\nProducto: *'+miproducto.nombre+'*')
+                                        client.sendMessage(msg.from, 'Genial, ingresa una cantidad (1-9) para agragar el producto: *'+miproducto.nombre+'*')
                                         status.set(msg.from, 1)
                                     }else{
                                         client.sendMessage(msg.from, 'Envia una opcion valida')
@@ -336,14 +324,14 @@ client.on('message', async msg => {
                                         negocio_name: miproducto.negocio_nombre
                                     }
                                     await axios.post(process.env.APP_URL+'api/chatbot/cart/add', midata)
-                                    client.sendMessage(msg.from, 'Genial, que extra quieres agregar ?')
-                                    // await extras_list(msg.from)
-                                    status.set(msg.from, 1.9)
+                                    extras_list(msg.from)
+                                    // client.sendMessage(msg.from, 'Genial, que extra quieres agregar ?')
+                                    status.set(msg.from, 1.2)
                                 }else if (msg.body === 'B' || msg.body === 'b') {
                                     client.sendMessage(msg.from, 'Genial, ingresa una cantidad para agragar a tu carrito (1-9)\nProducto: *'+miproducto.nombre+'*')
                                     status.set(msg.from, 1)
                                 }else{
-                                    client.sendMessage(msg.from, 'Ingresa un opcion')
+                                    client.sendMessage(msg.from, 'Envia un opcion valida')
                                 }
                                 break;
                             case 0.1:
@@ -388,7 +376,7 @@ client.on('message', async msg => {
                                 }
                                 break;
                             case 1: //agragar a carrito desde Y
-                                if (Number.isInteger(parseInt(msg.body))) {
+                                if (Number.isInteger(parseInt(msg.body)) && parseInt(msg.body) > 0 && parseInt(msg.body) <= 9) {
                                     var miprodcuto = carts.get(msg.from)                                         
                                     var midata = {
                                         product_id: miprodcuto.id,
@@ -421,29 +409,40 @@ client.on('message', async msg => {
                                     var list = '🤖Inicio del pedido🤖\n'
                                     list += '------------------------------------------\n'
                                     list += '*A* .- Envia tu ubicacion (mapa), no olvides habilitar tu GPS.\n'
-                                    list += '*B* .- Envia tu ultima ubicacion registrada.\n'   
+                                    list += '*B* .- Envia tu ultima ubicacion registrada.\n' 
+                                    list += '*C* .- Seguir comprando.\n'   
                                     list += 'Envia una opcion'                            
                                     client.sendMessage(msg.from, list)
                                     status.set(msg.from, 1.3)
-                                }else if (msg.body === 'C' || msg.body === 'c'){
-                                    await cart_list(msg.from, micliente)
-                                    status.set(msg.from, 1.2)
                                 }else{
                                     client.sendMessage(msg.from, 'Ingresa una opcion valida (1-9)')
                                 }
                                 break;
                             case 1.2: // set extras 
-                                if (extras.has(msg.body.toUpperCase())) {
-                                    var extra = await axios(process.env.APP_URL+'api/producto/extra/get/'+extras.get(msg.body.toUpperCase()))
-                                    extra_carts.set(msg.from, extras.get(msg.body.toUpperCase()))                 
+                                var miproducto = carts.get(msg.from)
+                                var validar = false
+                                var extra_id = 0
+                                var extra_nombre = null
+                                var milist = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']
+                                for (let index = 0; index < miproducto.extra.length; index++) {
+                                    if (milist[index] === msg.body.toUpperCase()) {
+                                        validar = true
+                                        extra_id = miproducto.extra[index].id
+                                        extra_nombre = miproducto.extra[index].nombre
+                                        break;
+                                    }
+                                }
+                                if (validar) {
+                                    extra_carts.set(msg.from, extra_id)
                                     status.set(msg.from, 1.9)      
-                                    client.sendMessage(msg.from, 'Ingresa una cantidad (1-9)\nExtra: *'+extra.data.nombre+'*')
+                                    client.sendMessage(msg.from, 'Ingresa una cantidad (1-9)\nExtra: *'+extra_nombre+'*')
                                 } else {
-                                    client.sendMessage(msg.from, 'Ingresa una opcion valida (1-9')
+                                    await extras_list(msg.from)
+                                    client.sendMessage(msg.from, 'Envia una opcion valida')
                                 }
                                 break;
                             case 1.9: // set cantidad extra
-                                if (Number.isInteger(parseInt(msg.body))) {
+                                if (Number.isInteger(parseInt(msg.body)) && parseInt(msg.body) <= 9 && parseInt(msg.body) > 0) {
                                     var miproducto = carts.get(msg.from)
                                     var extra = await axios(process.env.APP_URL+'api/producto/extra/get/'+extra_carts.get(msg.from))
                                     var cart = await axios(process.env.APP_URL+'api/cart/producto/get/'+msg.from)
@@ -1095,29 +1094,27 @@ const cart_list = async (phone, micliente) => {
 
 const extras_list = async (phone) => {
     var miproducto = carts.get(phone)
-    var product = await axios(process.env.APP_URL+'api/producto/'+miproducto.id)
-    var miresponse = await axios(process.env.APP_URL+'api/producto/extra/negocio/'+product.data.negocio_id)
-    var list = '*Elije un extra para agreagar a tu producto:* \n'+product.data.nombre+'\n'
+    var milist = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']
+    var list = '*Elije un extra para agreagar a tu producto:* \n'+miproducto.nombre+'\n'
     list += '------------------------------------------\n'
-    for (let index = 0; index < miresponse.data.length; index++) {
-        list += '*E'+miresponse.data[index].id+'* .- '+miresponse.data[index].nombre+' ('+miresponse.data[index].precio+' Bs.)\n'
-        extras.set('E'+miresponse.data[index].id, miresponse.data[index].id)
+    for (let index = 0; index < miproducto.extra.length; index++) {
+        list += '*'+milist[index]+'* .- '+miproducto.extra[index].nombre+' ('+miproducto.extra[index].precio+'Bs.)\n'
     }
-    list += 'Envia una opcion ejemplo: E'+miresponse.data[0].id
+    list += 'Envia una opcion ejemplo: A'
     client.sendMessage(phone, list)
 }
 
-const extras_view = async (phone) => {
-    var miprodcuto = carts.get(phone)
-    var product = await axios(process.env.APP_URL+'api/producto/'+miprodcuto.id)
-    var miresponse = await axios(process.env.APP_URL+'api/producto/extra/negocio/'+product.data.negocio_id)
-    var list = ''
-    for (let index = 0; index < miresponse.data.length; index++) {
-        list += '*X'+miresponse.data[index].id+'* .- '+miresponse.data[index].nombre+' ('+miresponse.data[index].precio+' Bs.)\n'
-        extras.set('X'+miresponse.data[index].id, miresponse.data[index].id)
-    }
-    client.sendMessage(phone, list)
-}
+// const extras_view = async (phone) => {
+//     var miprodcuto = carts.get(phone)
+//     var product = await axios(process.env.APP_URL+'api/producto/'+miprodcuto.id)
+//     var miresponse = await axios(process.env.APP_URL+'api/producto/extra/negocio/'+product.data.negocio_id)
+//     var list = ''
+//     for (let index = 0; index < miresponse.data.length; index++) {
+//         list += '*X'+miresponse.data[index].id+'* .- '+miresponse.data[index].nombre+' ('+miresponse.data[index].precio+' Bs.)\n'
+//         extras.set('X'+miresponse.data[index].id, miresponse.data[index].id)
+//     }
+//     client.sendMessage(phone, list)
+// }
 
 const negocios_list = async (phone, micliente) =>{
     var miresponse = await axios(process.env.APP_URL+'api/negocios/'+micliente.data.poblacion_id)
